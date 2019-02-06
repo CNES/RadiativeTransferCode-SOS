@@ -1,0 +1,89 @@
+                    INSTALLATION DU CODE DES OS
+		    ---------------------------
+
+Version 3.1 : 10/12/2015	
+		  
+1.Environnement matériel et logiciel
+-------------------------------------
+L'environnement nécessaire à l'installation et à l'exécution du code des OS
+est le suivant:
+    - Environnement testés :
+          Station SUN sous système d'exploitation SOLARIS,
+	  PC LINUX sous système d'exploitation RedHat
+    - compilateur Fortran (g77, f77 ou gfortran)
+  
+    
+2.Arborescence SOS
+------------------
+Il faut copier l'arborescence SOS sur son compte utilisateur
+Cette arborescence se compose des sous répertoires suivants:
+   -src : contient les sources
+          SOS_ANGLES.F : Programme de calcul des fichiers d'angles (Gauss + utilisateurs).
+          SOS_AEROSOLS.F : Programme de calcul des paramètres radiatifs des aerosols.
+	  SOS_MIE.F  : calcul des fichiers de MIE.
+
+	  SOS_PROFIL.F : Programme de définition du profil atmospherique.
+	  	  
+	  SOS_SURFACE.F : Programme de calcul des fichiers de BRDF ou BPDF.
+	  SOS_NOM_FIC_SURFACE.F : définition des noms des fichiers 
+	  			  de BRDF ou BPDF.
+	  SOS_GLITTER : calcul des fichiers de BRDF/BPDF du glitter.
+	  SOS_ROUJEAN : calcul des fichiers de BRDF de Roujean.
+	  SOS_RONDEAUX_BREON : calcul des fichiers de BRDF/BPDF de Rondeaux ou Breon.
+	  SOS_NADAL   : calcul des fichiers de BRDF/BPDF de Nadal.
+	  
+
+	  	    
+          SOS.F        : code des OS, programme prncipal  
+	  SOS_OS.F     : code des OS, calcul du champ de rayonnement diffus
+	                 (I, Q, U) dans une atmosphere diffusante.   
+	  SOS_TRPHI.F  : code des OS, génère les fichiers résultats 
+	                 des paramètres de Stokes I, Q et U 
+         
+   -obj : espace de compilation
+   -exe : contient les exécutables et les procédures KSH pemettant
+          de lancer ces exécutables
+	  4 exécutables : SOS_AEROSOLS.exe pour le calcul des fichiers AEROSOLS,
+	                  SOS_PROFIL.exe pour le calcul des fichiers PROFILS,
+	                  SOS_SURFACE.exe pour le calcul des fichiers de BRDF/BPDF,
+			  SOS.exe pour le calcul des OS.
+	  2 fichier ksh (KornShell) : lanceOS.ksh
+	                              main_SOS.ksh
+	                              
+   -inc : contient le fichier d'include avec les constantes du code des OS.
+          Le fichier SOS.h est commun aux 5 programmes.
+	  
+   -gen : contient les Makefile (compilation et liens de l'applicatif).
+   
+   -fic : contient les fichiers des modèles de la WMO (Data_WMO),
+	  et les fichiers des modèles de Shettle & Fenn (Data_SF, IRefrac_LR,
+	  IRefrac_LU, IRefrac_OM, IRefrac_SR, IRefrac_SU)
+	  .
+   -doc : contient 3 fichiers textes 
+             Install.txt : installation du code des OS.
+	     Fichier.txt : description du contenu des fichiers utilisés 
+	                   par le code des OS.
+	     Manuel.txt  : lancement/exécution du code des OS.
+	     
+   
+   
+3.Génération de l'exécutable
+----------------------------
+a) par précaution , se positionner dans le répertoire SOS/obj 
+   et détruire les .o (rm *.o)
+b) positionner la variable d'environnement RACINE : 
+   chemin d'acces a l'arborescence SOS
+   exemple : export RACINE=/OTHER/CLAUDIE/SOS
+             La commande ls $RACINE permet d'afficher les 7 sous-répertoires
+	     décrits dans le paragraphes 2
+c) se positionner dans le répertoire gen (cd $RACINE/gen)
+d) lancer le makefile : 
+            make -f Makefile.xxx 
+	        avec xxx=g77 si l'on dispose du compilateur g77
+		avec xxx=f77 si l'on dispose du compilateur f77
+		avec xxx=f77 si l'on dispose du compilateur gfortran
+		
+   on trouve alors 
+   dans le répertoire $RACINE/obj, le résultat de la compilation
+   et dans le répertoire $RACINE/exe, 4 exécutables SOS_AEROSOLS.exe, 
+   SOS_ANGLES.exe, SOS_PROFIL.exe, SOS_SURFACE.exe et SOS.exe en plus de la procèdure KSH.

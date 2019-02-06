@@ -1,0 +1,202 @@
+DESCRIPTION DU CONTENU DES FICHIERS UTILISES OU CREES PAR LE CODE DES OS
+========================================================================
+
+1. Les fichiers d'angles 
+---------------------------------
+
+    Fichier utilisateur FICANGLES_USER: 
+    ----------------------------------
+      Fichiers Ascii contenant une liste d'angles (en degrés) à ajouter aux angles de Gauss
+      pour lesquels le poids attribues sera nuls (=> sans impact sur les 
+      intégrations spatiales)
+
+      Format : Une valeur d'angle par ligne d'enregistrement.
+               les angles doivent être compris entre 0 et 90 degrés.
+               Nombre d'enregistrements maximal : SOS_NBMAX_USER_ANGLES
+
+
+    Fichier d'angles pour les calculs Aerosols FICRES_MIE: 
+    -----------------------------------------------------
+      Fichier Ascii contenant les informations suivantes
+              NB_TOTAL_ANGLES :  nb d'angles total à utiliser
+              NB_GAUSS_ANGLES :  nb d'angles de Gauss
+              ANGLES_USERFILE :  Nom du fichier des angles utilisateur
+              INTERNAL_OS_NB :   Ordre des développements des fonctions de phase 
+ 				 en Polynomes de Legendre à utiliser.
+              INDEX COS_ANGLE WEIGHT : lignes donnant le numero d'angle, son cosinus et son poids
+                                       au format I4,X,2D21.14
+
+    Fichier d'angles pour les calculs de luminance FICRES_LUM: 
+    ---------------------------------------------------------
+    
+      Fichier Ascii contenant les informations suivantes
+	      NB_TOTAL_ANGLES :    nb d'angles total à utiliser
+              NB_GAUSS_ANGLES :    nb d'angles de Gauss
+              ANGLES_USERFILE :    Nom du fichier des angles utilisateur
+	      SOLAR ZENITH ANGLE : Angle zénithal solaire (degres)
+	      INTERNAL_IMUS :      Numero d'indice de table correspondant
+              INTERNAL_OS_NB :     Ordre des développements des fonctions de phase 
+				   en Polynomes de Legendre à utiliser.
+              INTERNAL_OS_NS :     Ordre maximal à utiliser pour le developpement en
+                                   polynomes de Legendre des elements de la matrice de Fresnel 
+                                   et en séries de Fourier des calculs de luminance.
+              INTERNAL_OS_NM :     Ordre maximal du developpement en séries de Fourier  
+                                   de la fonction G des calculs de matrice de reflexion.
+              INDEX COS_ANGLE WEIGHT OUTPUT: lignes donnant le numero d'angle, son cosinus 
+                                             et son poids, s'il est donné en sortie "utilisateur"
+                                             au format I4,X,2D21.14,X,I4
+            
+      
+2.Le fichier de MIE
+-------------------
+       Fichier binaire non formaté, créé par SOS_MIE, utilisé/lu par SOS_GRANU
+       1 enregistrement d'entete avec
+                Indice de réfraction (partie réelle)
+                Indice de réfraction (partie imaginaire)
+                Paramètre de taille limite
+                Nombre d'angles de Gauss positifs
+
+       1 enregistrement pour chaque valeur du paramètre de taille avec:
+        - Paramètre de taille (réel),
+        - Coefficient d'efficacité en extinction (réel),
+        - Coefficient d'efficacité en diffusion (réel),
+        - Facteur d'anisotropie (double precision),
+        - Tableau de la fonction de phase Imie(mu) (réel),
+        - Tableau de la fonction de phase polarisee Qmie(mu) (réel),
+        - Tableau de la fonction de phase polarisee Umie(mu) (réel).
+
+           
+3.Le fichier de fonctions de phase externes
+-------------------------------------------
+       Fichier ascii formaté, cree par l'utilisateur.
+       Le format de ce fichier s'inspire de celui de l'outil DLS d'Oleg Dubovik (LOA)
+       fournissant les propriétés de diffusion primaire de particules
+       sphéroides homogènes orientées de facon aléatoire.
+       Les premières lignes ont dû être adaptées.
+ 
+          1ere ligne : EXTINCTION_COEF : Valeur 
+              Valeurs : Section efficace d'extinction (micron²)
+              Format  : Commentaire + séparateur « : » + valeur (réel non formaté)
+                
+          2eme ligne : SCATTERING_COEF : Valeur 
+              Valeurs : Section efficace de diffusion (micron²)
+              Format  : Commentaire + séparateur « : » + valeur (réel non formaté)
+
+	  3eme ligne : NB_LINES : nbAng
+              Valeur : Nombre d'angles décrivant les fonctions de phase.
+              Format : Commentaire + séparateur « : » + valeur (entier non formaté)
+              
+          4eme ligne : Ligne de commentaire 
+          
+          Lignes 5 à 5+nbAng-1
+               Valeurs : ANGLE  F11  -F12/F11  F22/F1   F33/F11
+                           ANGLE 	: angle en degrés.
+                           F11 		: fonction de phase en intensiteé
+ 			   -F12/F11 	: rapport des fonctions -F12 et F11
+ 			   F22/F11 	: rapport des fonctions F22 et F11
+ 			   F33/F11 	: rapport des fonctions F33 et F11 
+               ----------------------   ===========================================
+               NB CONVENTION DE SIGNE : F12 est négative pour la diffusion Rayleigh.
+                                        = convention des OS
+               ----------------------   ===========================================
+ 		 Format  : Valeurs réelles, non formatées
+ 
+          Pas de lecture des lignes suivantes.	
+
+
+4.Le fichier de BRDF / BPDF
+--------------------------
+       Fichier binaire non formaté, créé par SOS_SURFACE, utilisé/lu par SOS_OS
+       Il contient la matrice de réflexion de surface sur mer agitée (glitter)
+       ou autres BRDF / BPDF (modèles de Roujean, Rondeaux, Bréon, Nadal) :
+       c'est à dire les éléments Pij de la matrice de réflexion 
+       de surface
+              P11(LUM_NBMU,LUM_NBMU) (réel),
+              P12(LUM_NBMU,LUM_NBMU) (réel),
+              P13(LUM_NBMU,LUM_NBMU) (réel),
+              P21(LUM_NBMU,LUM_NBMU) (réel),
+              P22(LUM_NBMU,LUM_NBMU) (réel),
+              P23(LUM_NBMU,LUM_NBMU) (réel),
+              P31(LUM_NBMU,LUM_NBMU) (réel),
+              P32(LUM_NBMU,LUM_NBMU) (réel),
+              P33(LUM_NBMU,LUM_NBMU) (réel)
+
+
+5.Le fichier résultat des OS (décomposition en séries de Fourier)
+-----------------------------------------------------------------
+       Fichier binaire non formaté, créé par SOS_OS
+       Il contient les paramètres de Stokes Q , U et I pour un ordre S
+       du développement en séries de Fourier, en fonction de l'angle mu
+       (valeurs en double precision).
+
+
+
+6.Le fichier résultat des OS pour le champ montant (après recombinaison des 
+  séries de Fourier)
+---------------------------------------------------------------------------
+       Fichier Ascii, créé par SOS_TRPHI
+       format d'un enregistrement 4(E13.6,4X) ou 5(E13.6,4X)
+       2 cas : ITRPHI = 1, 
+               on obtient le plan de visées pour l'azimut PHIos et PHIos + 180 deg.
+               Nombre d'enregistrements : 
+                   un pour chaque valeur de -LUM_NBMU a LUM_NBMU
+               Chaque enregisqtrement contient 4 valeurs
+                Angle de visee(en degres) et les parametres de Stokes I,Q,U
+	       Convention : L'angle de visee est positif pour le demi plan Phios,
+	                    il est négatif pour le demi plan Phios + 180 deg. 	 
+
+               ITRPHI = 2, 
+               on obtient un diagramme polaire en fonction de l'angle 
+               de visee (teta) et de l'angle azimutal (phi) 
+               Nombre d'enregistrements :
+                   Pour chaque valeur d'azimut (de 0 a 360 degrés par pas PAS_PHI),
+		   un enregistrement pour chaque angle de visee (indice de 1 à
+		   LUM_NBMU)
+               Chaque enregisqtrement contient 5 valeurs
+                Coordonnees polaires Phi et Teta et les parametres de Stokes I,Q,U 
+
+
+
+7.Le fichier resultat des OS pour le champ descendant
+-----------------------------------------------------
+      Fichier Ascii, créé par SOS_TRPHI
+      format d'un enregistrement (F7.2,2X,3(F13.6,2X)) ou (2(F7.2,2X),3(F13.6,2X))
+      Même description que pour le fichier résultat pour le champ montant
+
+
+8.Le fichier resultat des valeurs de transmissions
+-----------------------------------------------------
+      Fichier Ascii, créé par SOS
+      Contenu : 
+         Solar Zenithal Angle : Valeur (pas de format spécifié)
+         Direct transmission  TOA -> Surface : Valeur (pas de format spécifié)
+         Diffuse transmittance : TOA -> Surface
+              Valeur : FORMAT(12h    thetas =,1x,f6.3,3x,12htd(thetas) =,1x,f7.4)  
+         Diffuse transmittance : surface -> TOA
+              1 ligne par angle de visée
+              Valeur : FORMAT(12h    thetav =,1x,f6.3,3x,12htd(thetav) =,1x,f7.4)  
+
+9.Les fichiers traces
+---------------------
+      Fichiers ASCII, crees par SOS_ANGLES, SOS_AEROSOLS, SOS_SURFACE, SOS_PROFIL et SOS
+      Option au lancement des exécutables pour créer ou non un fichier trace
+      Contient des résultats intermédiaires permettant de valider les calculs
+      Si un fichier de même nom existe deja, le nouveau fichier trace l'écrase
+      Remarque : Le fichier trace est spécifique à chaque calcul : 
+                 un pour SOS_ANGLES, un pour SOS_AEROSOLS, un pour SOS_SURFACE,  
+		 un pour SOS_PROFIL et un pour SOS.
+		 Leur donner des noms différents.
+
+
+10.Les fichiers temporaires
+--------------------------
+      L'exécutable SOS_SURFACE crée 3 fichiers temporaires RES_GSF, RES_FRESNEL 
+      et RES_MAT_REFLEX dans le repertoire de lancement du programme.
+      Ces fichiers sont détruits à la fin de l'exécution du programme
+      SOS_SURFACE sauf en cas d'erreur.
+      
+      L'exécutable SOS crée un fichier temporaire "FICOS_TRANSM_TMP" si l'utilisateur
+      a sollicité un calcul de transmission. 
+      Ce fichier est détruit à la fin de l'exécution du programme 
+      SOS sauf en cas d'erreur
+

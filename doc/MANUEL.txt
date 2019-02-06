@@ -1,0 +1,102 @@
+                EXECUTER le code des OS
+		=======================
+
+Version 3.1 : 10/12/2015
+
+
+1-Prerequis
+-----------		
+Le code des OS doit être installé (voir INSTALL.txt)
+
+
+2-Fichiers nécessaires pour lancer le code des OS
+---------------------------------------------------
+Dans le répertoire exe de l'arborescence SOS, on trouve 
+    1 procédures de lancement (KSH) :
+           runOS.ksh   
+    1 script KSH qui gère l'enchainement des traitements
+           main_SOS.ksh	       	  
+    4 exécutables (résultat de l'installation)
+           SOS.exe           
+	   SOS_AEROSOLS.exe 
+	   SOS_ANGLES.exe  
+	   SOS_PROFIL.exe    
+	   SOS_SURFACE.exe    
+	   
+
+3-Description des fichiers KSH
+------------------------------	   
+Le fichier runOS.ksh permet de définir les paramètres de traitement.
+Il passe les arguments au script de traitement main_SOS.ksh.
+
+Le fichier main_SOS.ksh permet d'enchainer l'exécution de
+	  SOS_ANGLES.exe 	calcul des fichiers d'angles
+	  SOS_SURFACE.exe 	calcul du fichier de BRDF / BPDF
+          SOS_AEROSOLS.exe  	calcul du fichier Aerosols
+	  SOS_PROFIL.exe 	calcul du fichier Profil
+	  SOS.exe      		calcul des OS
+en positionnant les arguments nécessaires à chaque programme.
+
+Il gère l'utilisation d'une longueur d'onde de réfèrence pour le calcul
+des propriétés radiatives des aérosols.
+
+Le calcul des fichiers de MIE et des fichiers de BRDF/BPDF n'est réalisé que 
+si le fichier résultat n'existe pas déjà (contrôle sur le nom du fichier 
+résultat ).
+Le nom du fichier résultat peut être fixé ou déduit en fonction des autres
+arguments du programme.
+
+
+Pour l'utilisateur, le seul fichier à manipuler/modifier est runOS.ksh.
+
+
+4-Mise à jour du fichier runOS.ksh
+-------------------------------------
+Le fichier runOS.ksh permet de positionner les arguments de chaque exécutable.
+
+Les valeurs positionnées actuellement servent d'exemple.
+
+Tous les arguments et leur format sont décrits dans les cartouches 
+du fichier runOS.ksh.
+
+L'utilisateur doit éditer le fichier runOS.ksh. 
+Il doit définir 2 variables d'environnement utilisées ensuite dans le fichier:
+      SOS_RACINE    Chemin d'acces à l'arborescence SOS.
+                    ls $SOS_RACINE/exe (liste des exeécutables et des ksh).
+		    variable utilisée pour accéder aux exécutables et 
+		    aux procèdures KSH.
+      SOS_RESULT    Répertoire de stockage des fichiers résultats
+                    (répertoire spécifique de l'utilisateur)
+		    Ne pas oublier de créer ce répertoire (par mkdir) 
+		    s'il n'existe pas
+		    
+Dans l'exemple actuel, les fichiers résultats de chaque exécutable sont
+stockés respectivement dans  
+     $SOS_RESULT/MIE   			 fichier de MIE
+     
+     $SOS_RESULT/SURFACE/BREON		 fichier BPDF de Breon
+     $SOS_RESULT/SURFACE/GLITTER	 fichier BRDF/BPDF du glitter
+     $SOS_RESULT/SURFACE/NADAL		 fichier BPDF de Nadal
+     $SOS_RESULT/SURFACE/RH		 fichier BPDF de Rondeaux-Herman
+     $SOS_RESULT/SURFACE/ROUJEAN	 fichier BRDF de Roujean
+     
+     $SOS_RESULT/SOS    fichier résultat des OS
+     
+     $SOS_RESULT/LOG    fichier trace
+     
+Si l'utilisateur veut conserver cette organisation, il doit créer 
+les sous-répertoires.
+
+5-Lancement du code des OS
+--------------------------
+runOS.ksh
+
+Toute erreur lors de l'exécution d'un programme est signalée par un message 
+à l'écran et interrompt les calculs.
+
+
+
+
+
+
+

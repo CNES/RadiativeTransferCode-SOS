@@ -1,0 +1,181 @@
+################################################################################
+# TITRE: Fichier makefile de l'application SOS 
+#        Makefile Solaris 
+#
+# ROLE: definir la procedure de generation de l'application SOS
+#	
+# AUTEUR: B. LAFRANCE - C. CASTERAS ( CS )
+# DATE: 28/09/00
+#
+#
+# Pour utiliser ce Makefile , les variables d'environnement
+# suivantes doivent etre definies : 
+#	RACINE:	espace de descente de SOS (ex. /ORS1_2/SOS/)
+#
+# Lancement de la compilation par : make -f Makefile.gfortran
+#
+# Pour compiler en debug, positionner DEBUG
+# et ne pas utiliser d'option d'optimisation CCOPTS
+#	DEBUG: -g -D_DEBUG
+#
+#
+# MOD:VERSION:1.0: 28/09/200 : creation 
+# MOD:VERSION:2.0: 11/01/2010: ajout de la routine SOS_ANGLES.F
+# MOD:VERSION:2.1: 14/01/2019: creation du repertoire obj durant la compilation
+#  
+################################################################################
+
+#!/bin/ksh
+
+################################
+# Initialisation des variables 
+################################
+mkdir		=	mkdir -p
+rm		=	rm
+FF		=	gfortran
+###DEBUG		=	-g 
+CCOPTS  =  -O
+
+########################################
+# Definition des includes et librairies
+########################################
+CFLAGS +=  -DSYSV
+LIBS	=  -lm
+
+
+###########################
+# Repertoires utilisateur 
+###########################
+SRC	=	$(RACINE)/src
+BIB	=	$(RACINE)/obj
+EXE    =      $(RACINE)/exe
+NCL	=	$(RACINE)/inc
+
+#############################
+# Liste des fichiers objets 
+#############################
+OBJS_ANGLES   =      $(BIB)/SOS_ANGLES.o
+OBJS_SOS	=	$(BIB)/SOS.o \
+                     $(BIB)/SOS_NOM_FIC_SURFACE.o \
+			$(BIB)/SOS_OS.o \
+			$(BIB)/SOS_TRPHI.o \
+			$(BIB)/SOS_ROUJEAN.o
+OBJS_SURFACE  =      $(BIB)/SOS_SURFACE.o \
+                     $(BIB)/SOS_NOM_FIC_SURFACE.o \
+                     $(BIB)/SOS_GLITTER.o \
+			$(BIB)/SOS_ROUJEAN.o \
+			$(BIB)/SOS_RONDEAUX_BREON.o \
+			$(BIB)/SOS_NADAL.o
+OBJS_AEROSOLS =      $(BIB)/SOS_AEROSOLS.o \
+                     $(BIB)/SOS_MIE.o			
+OBJS_PROFIL   =      $(BIB)/SOS_PROFIL.o
+
+
+###########################################
+# Liste des fichiers includes necessaires 
+###########################################
+DEP	=	$(NCL)/SOS.h
+
+all::$(EXE)/SOS_ANGLES.exe $(EXE)/SOS_SURFACE.exe $(EXE)/SOS_AEROSOLS.exe $(EXE)/SOS_PROFIL.exe $(EXE)/SOS.exe 
+
+#####################
+# Edition des liens
+#####################
+$(EXE)/SOS_ANGLES.exe : $(OBJS_ANGLES) 
+	@echo "------------> Link de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -o $@  $(OBJS_ANGLES) $(LIBS)
+	@echo "Copie du fichier de constantes utilisees pour la compilation des executables" > $(EXE)/config.txt
+	@echo "--> $(NCL)/SOS.h \n\n" >> $(EXE)/config.txt
+	@cat  $(NCL)/SOS.h >> $(EXE)/config.txt
+	@echo "------------>ok\n"
+	
+$(EXE)/SOS_SURFACE.exe : $(OBJS_SURFACE) 
+	@echo "------------> Link de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -o $@  $(OBJS_SURFACE) $(LIBS)
+	@echo "Copie du fichier de constantes utilisees pour la compilation des executables" > $(EXE)/config.txt
+	@echo "--> $(NCL)/SOS.h \n\n" >> $(EXE)/config.txt
+	@cat  $(NCL)/SOS.h >> $(EXE)/config.txt
+	@echo "------------>ok\n"
+	
+$(EXE)/SOS_AEROSOLS.exe : $(OBJS_AEROSOLS) 
+	@echo "------------> Link de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -o $@  $(OBJS_AEROSOLS) $(LIBS)
+	@echo "Copie du fichier de constantes utilisees pour la compilation des executables" > $(EXE)/config.txt
+	@echo "--> $(NCL)/SOS.h \n\n" >> $(EXE)/config.txt
+	@cat  $(NCL)/SOS.h >> $(EXE)/config.txt
+	@echo "------------>ok\n"
+
+$(EXE)/SOS_PROFIL.exe : $(OBJS_PROFIL) 
+	@echo "------------> Link de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -o $@  $(OBJS_PROFIL) $(LIBS)
+	@echo "Copie du fichier de constantes utilisees pour la compilation des executables" > $(EXE)/config.txt
+	@echo "--> $(NCL)/SOS.h \n\n" >> $(EXE)/config.txt
+	@cat  $(NCL)/SOS.h >> $(EXE)/config.txt
+	@echo "------------>ok\n"
+			
+$(EXE)/SOS.exe : $(OBJS_SOS) 
+	@echo "------------> Link de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -o $@  $(OBJS_SOS) $(LIBS)
+	@echo "Copie du fichier de constantes utilisees pour la compilation des executables" > $(EXE)/config.txt
+	@echo "--> $(NCL)/SOS.h \n\n" >> $(EXE)/config.txt
+	@cat  $(NCL)/SOS.h >> $(EXE)/config.txt
+	@echo "------------>ok\n"
+
+
+	
+###################################
+# Compilation des fichiers objets 
+###################################
+$(BIB)/SOS_ANGLES.o:$(SRC)/SOS_ANGLES.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(mkdir)  $(BIB)
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_ANGLES.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_AEROSOLS.o:$(SRC)/SOS_AEROSOLS.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_AEROSOLS.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_MIE.o:$(SRC)/SOS_MIE.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_MIE.F -o $@ $(CFLAGS) -I$(NCL)
+	
+$(BIB)/SOS_SURFACE.o:$(SRC)/SOS_SURFACE.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_SURFACE.F -o $@ $(CFLAGS) -I$(NCL)	
+
+$(BIB)/SOS_NOM_FIC_SURFACE.o:$(SRC)/SOS_NOM_FIC_SURFACE.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_NOM_FIC_SURFACE.F -o $@ $(CFLAGS) -I$(NCL)	
+	
+$(BIB)/SOS_GLITTER.o:$(SRC)/SOS_GLITTER.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_GLITTER.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_ROUJEAN.o:$(SRC)/SOS_ROUJEAN.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_ROUJEAN.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_RONDEAUX_BREON.o:$(SRC)/SOS_RONDEAUX_BREON.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_RONDEAUX_BREON.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_NADAL.o:$(SRC)/SOS_NADAL.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_NADAL.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_PROFIL.o:$(SRC)/SOS_PROFIL.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_PROFIL.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS.o:$(SRC)/SOS.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_OS.o:$(SRC)/SOS_OS.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_OS.F -o $@ $(CFLAGS) -I$(NCL)
+
+$(BIB)/SOS_TRPHI.o:$(SRC)/SOS_TRPHI.F $(DEP) 
+	@echo "------------> Compilation de $@"
+	@$(FF) $(CCOPTS) $(DEBUG) -c $(SRC)/SOS_TRPHI.F -o $@ $(CFLAGS) -I$(NCL)
+
