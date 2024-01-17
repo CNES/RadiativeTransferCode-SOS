@@ -1,33 +1,33 @@
 C******************************************************************************
-C* Copyright 2017, Centre National d'Etudes Spatiales (CNES)
+C* Copyright 2023, Centre National d'Etudes Spatiales (CNES)
 C* 
-C* This file is part of SOS.
+C* This file is part of the SOS-ABS radiative transfer code.
 C* 
-C* SOS is free software: you can redistribute it and/or modify
+C* SOS-ABS is free software: you can redistribute it and/or modify
 C* it under the terms of the GNU General Public License as published by
 C* the Free Software Foundation, either version 3 of the License, or
 C* (at your option) any later version.
 C* 
-C* SOS is distributed in the hope that it will be useful,
+C* SOS-ABS is distributed in the hope that it will be useful,
 C* but WITHOUT ANY WARRANTY; without even the implied warranty of
 C* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 C* GNU General Public License for more details.
 C* 
 C* You should have received a copy of the GNU General Public License
-C* along with SOS. If not, see <http://www.gnu.org/licenses/>.
+C* along with SOS-ABS. If not, see <http://www.gnu.org/licenses/>.
 C******************************************************************************
 
 
 C****************************************************************************
 C* FICHIER: SOS_OS.F
 C* PROJET: Ordres successifs de diffusion
-C* ROLE: Ce module gere les procedures permettant les calculs de resolution
+C* ROLE: Ce module gÃ¨re les procedures permettant les calculs de resolution
 C*       de l'Equation de Transfert Radiatif, en polarisation, par ordres
 C*       successifs de diffusion.
 C*
 C* AUTEUR: 
 C*   Code initial: Laboratoire d'Optique Atmospherique (LOA, Villeneuve d'Ascq).
-C*   Reprise du codage et developpement : CS SI, B.Lafrance, C. Casteras.
+C*   Reprise du codage et dÃ©veloppement : CS GROUP France, B.Lafrance
 C* DATE: 30/04/02
 C*
 C* MOD:VERSION:1.0: Mise a niveau du code des OS du LOA
@@ -37,13 +37,13 @@ C*                             fichier de Trace
 C*                             ==> Numero de niveau sur 4 caracteres au lieu de 3.
 C* MOD:VERSION:3.0: 10/01/2010 
 C*   - Modification de la taille des tableaux de champs de luminance :
-C*     ==> Passage de SOS_OS_NBMU a SOS_OS_NBMU_MAX.
+C*     ==> Passage de CTE_OS_NBMU Ã  CTE_OS_NBMU_MAX.
 C*
-C*   - Modification de la taille des tableaux des ordres de developpement :
-C*     ==> Passage de SOS_OS_NB  a SOS_OS_NB_MAX.
+C*   - Modification de la taille des tableaux des ordres de dÃ©veloppement :
+C*     ==> Passage de CTE_OS_NB Ã  CTE_OS_NB_MAX.
 C*
-C*   - Ajout du parametre d'entree : NBMU (nb d'angles effectifs pour les simulations)
-C*   - Ajout du parametre d'entree : OS_NB (ordre max des developpements des fonctions 
+C*   - Ajout du paramÃ¨tre d'entrÃ©e : NBMU (nb d'angles effectifs pour les simulations)
+C*   - Ajout du paramÃ¨tre d'entrÃ©e : OS_NB (ordre max des dÃ©veloppements des fonctions 
 C		                    de phase en Polynomes de Legendre a utiliser).
 C*
 C*   - Modification de la ligne d'enregistrement des tableaux de luminances 
@@ -57,44 +57,70 @@ C*
 C*   - Adaptation des routines SOS_MAT_FRESNEL_PLAN_REFL, SOS_NOYAUX, 
 C*     SOS_INTEGR_EPOPT, SOS_FSOURCE_ORDRE1, SOS_FSOURCE_ORDREIG,
 C*     SOS_FSOURCE_DIFF_FRESNEL1, SOS_PARAM_CONV, SOS_ARRET_DIFFUS, 
-C*     SOS_ARRET_FOURIER et SOS_AJOUT_QUEUE au passage du parametre
+C*     SOS_ARRET_FOURIER et SOS_AJOUT_QUEUE au passage du paramÃ¨tre
 C*     LUM_NBMU (nb d'angles utiles).
 C*  
 C*   - Adaptation de la routine SOS_NOYAUX au passage de OS_NB
-C*     (pour boucler sur les ordres de developpement).
+C*     (pour boucler sur les ordres de dÃ©veloppement).
 C*
-C*   - Le calcul du flux diffus incident (normalise par l'eclairement solaire) EMOINS
+C*   - Le calcul du flux diffus incident (normalisÃ© par l'eclairement solaire) EMOINS
 C*     est passe en argument de sortie 
 C*     (pour fournir la transmission diffuse si le sol est noir)
 C*
 C*   - Correction d'une erreur de dimensionnement de boucle pour l'annulation de la  
 C*     polarisation de surface (IPOLAR=0 & IMAT_SURF=1) : demarrage de boucle 0 --> 1
 C*
-C* MOD:VERSION:3.1: 08/12/2015
+C* MOD:VERSION:3.1: 06/06/2013
+C*
+C*   -  Modification de la valeur de Pi, declaree en constante dans le fichier
+C*      (INCTE_PI remplace CTE_PI)
+C*
+C*   -  Modification de la constante SOS_NT remplace par le paramÃ¨tre NT
+C*
+C*   -  L'identifiant du log auparavant ecrit en dur est remplace par le paramÃ¨tre
+C*      IDLOG fourni en entrÃ©e
+C*
+C*   -  Ajout de SOS_ARRET_DIFFUS_1 et modif de SOS_ARRET_DIFFUS en SOS_ARRET_DIFFUS_2
+C*
+C* MOD:VERSION:3.2: 24/02/2016 
 C*    - Ajustements mineurs pour le respect strict des 72 colonnes 
-C*      (incluant au d�codage des constante) : requis pour compilation gfortran
+C*
+C* MOD:VERSION:3.3: 31/08/2022
+C*    - Renommage des constantes de SOS_* en CTE_*
+C*    - Conversion des traces en Anglais.
+C*
+C* MOD:VERSION:3.4: 26/09/2023
+C*    - Suppression d'une virgule après la commande READ(...) lors de la lecture des matrices de surface.
+C*      Impact nul sur les résultats de simulations, mais levant un warning à la compilation.
+C*    - Modification de la syntaxe de boucles multiples dans les routines SOS_NOYAUX, SOS_INTEGR_EPOPT, 
+C*      SOS_FSOURCE_ORDREIG et SOS_FSOURCE_DIFF_FRESNEL1  
+C*      pour compatibilité avec Fortran 2018 pour compilateur gcc/10.2.0
+C*    - Modification de la syntaxe de tests IF obsolètes dans les routines SOS_FSOURCE_DIFF_FRESNEL1,  
+C*      SOS_FSOURCE_ORDREIG, SOS_PARAM_CONV, SOS_ARRET_DIFFUS_1 et SOS_ARRET_DIFFUS_2 
+C*      pour compatibilité avec Fortran 2018 pour compilateur gcc/10.2.0
+C*
+C*
 C****************************************************************************
 
 C----------------------------------------------------------------------------
 C Definition des constantes  
 C---------------------------------------------------------------------------- 
 C Constantes utilisees :
-C    SOS_LENDIR : Longueur des noms de repertoires.
-C    SOS_LENFIC2 : Longueur des noms de fichiers avec arborescence.
-C    SOS_PI : valeur de PI                           
-C    SOS_OS_NB_MAX :  Valeur maximale pour l'ordre limite du developpement en 
+C    CTE_LENDIR : Longueur des noms de repertoires.
+C    CTE_LENFIC2 : Longueur des noms de fichiers avec arborescence.
+C    INCTE_PI : valeur de PI                           
+C    CTE_OS_NB_MAX :  Valeur maximale pour l'ordre limite du dÃ©veloppement en 
 C                     polynomes de Legendre (dimensionnement des tables).
-C    SOS_OS_NT : Nombre de couches du profil atmospherique.
-C    SOS_OS_NBMU_MAX : Nombre maximal d'angles positifs pour la resolution de l'ETR
-C    SOS_OS_IBOR : Ordre minimal du developpement en series de Fourier
-C    SOS_PH_SEUIL_CV_SG : Seuil de convergence en serie geometrique.
-C    SOS_PH_SEUIL_SUMDIF : Seuil d'arret des diffusions multiples.
-C    SOS_PH_SEUIL_SF : Seuil pour l'arret de la decomposition en series 
+C    CTE_OS_NT : Nombre de couches du profil atmospherique.
+C    CTE_OS_NBMU_MAX : Nombre maximal d'angles positifs pour la resolution de l'ETR
+C    CTE_OS_IBOR : Ordre minimal du dÃ©veloppement en series de Fourier
+C    CTE_PH_SEUIL_CV_SG : Seuil de convergence en serie geometrique.
+C    CTE_PH_SEUIL_SUMDIF : Seuil d'arret des diffusions multiples.
+C    CTE_PH_SEUIL_SF : Seuil pour l'arret de la decomposition en series 
 C                      de Fourier.
 C----------------------------------------------------------------------------
 #include "SOS.h"
-
-
+#define INCTE_PI DACOS(-1.D+00)
 
 C*==========================================================================
 C PROCEDURE: SOS_OS
@@ -103,69 +129,95 @@ C      Cette procedure calcule le champ de rayonnement diffus (I, Q, U) dans
 C      une atmosphere diffusante. 
 C      Le champ resultat est decomposee en series de Fourier.
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C ---------------------------
 C     NBMU (I4) : (E) Nombre d'angles (positifs) effectivement utiles
 C
-C     RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (DOUBLE) : (E) Cosinus des angles.
-C     GA(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (DOUBLE)  : (E) Poids des angles.
+C     RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (DOUBLE) : (E) Cosinus des angles.
+C     GA(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (DOUBLE)  : (E) Poids des angles.
 C
-C     OS_NB (I4) : (E) Ordre max des developpements des fonctions de phase 
+C     OS_NB (I4) : (E) Ordre max des dÃ©veloppements des fonctions de phase 
 C		       en Polynomes de Legendre a utiliser.
 C
-C     FICSURF (CHARACTER*SOS_LENFIC2)  (E) : 
+C     NT (I4) : (E) Nombre de couches dans le profil atmospherique 
+C
+C     FICSURF (CHARACTER*CTE_LENFIC2)  (E) : 
 C                           nom du fichier contenant la matrice de reflexion 
 C                           de surface (fichier Glitter ou autres BRDF/BPDF).
 C                           (repertoire + nom fichier + extension)
-C     FICOS   (CHARACTER*SOS_LENFIC2)  (E) : 
+C
+C     FICOS   (CHARACTER*CTE_LENFIC2)  (E) : 
 C                           nom du fichier resultat des OS 
 C                           (repertoire + nom fichier + extension)
+C
 C     N0  (I4)   (E) : Numero de mu de Gauss pour l'angle zenithal solaire.
 C                     (angle complementaire : mus = -rmu(N0))
 C                     (N0 > 0 => pour en tenir compte).
+C
 C     TETAS (double)   (E) : Angle zenithal solaire.
 C                           (angle complementaire : mus= -cos(tetas))
 C                           (N0 < 0 => pour en tenir compte).
-C     RO (double)   (E) : Albedo de surface.
+C
+C     RO (double)   (E) : AlbÃ©do de surface.
+C
 C     IMAT_SURF  (I4)   (E) : Option de BRDF / BPDF de surface
-C      		        0 :surface lambertienne d'albedo RHO.
-C			1 :surface lambertienne + glitter.
-C			2 :surface lambertienne + reflexion de Fresnel.
-C		        3 :surface lambertienne + BRDF de Roujean.
-C			4 :surface lambertienne + BRDF de Roujean + BPDF de Rondeaux.
-C			5 :surface lambertienne + BRDF de Roujean + BPDF de Breon.
-C			6 :surface lambertienne + BRDF de Roujean + BPDF de Nadal.	
-C     IFRESNEL  (I4)  (E) : Option de calcul de reflexion de Fresnel 
-C                           sur mer plate
-C                        = 0 : pas de reflexion sur mer plate.
-C                        = 1 : calcul de la reflexion de Fresnel sur mer plate.
-C     IND_SURF (double) (E) : Indice de refraction du dioptre surface / atmosphere.
-C     H(0:SOS_OS_NT) (double)   (E) : Epaisseur optique a chaque niveau.
-C     XDEL(0:SOS_OS_NT) (double)   (E) : Pourcentage d'aerosols par niveau.
-C     YDEL(0:SOS_OS_NT) (double)   (E) : Pourcentage de molecules par niveau.
+C      		        0 :surface lambertienne d'albÃ©do RHO.
+C			        1 :surface lambertienne + glitter.
+C			        2 :surface lambertienne + reflexion de Fresnel.
+C		               3 :surface lambertienne + BRDF de Roujean.
+C			        4 :surface lambertienne + BRDF de Roujean + BPDF de Rondeaux.
+C			        5 :surface lambertienne + BRDF de Roujean + BPDF de Breon.
+C			        6 :surface lambertienne + BRDF de Roujean + BPDF de Nadal.
+C			       7 :surface lambertienne + BRDF de Roujean + BPDF de Maignan.	
+C
+C     IFRESNEL  (I4)  (E) : Option de calcul de reflexion de Fresnel sur mer plate
+C                            0 : pas de reflexion sur mer plate.
+C                            1 : calcul de la reflexion de Fresnel sur mer plate.
+C
+C     IND_SURF (double) (E) : Indice de rÃ©fraction du dioptre surface / atmosphere.
+C
+C     H(0:CTE_OS_NT) (double)   (E) : Epaisseur optique a chaque niveau.
+C
+C     XDEL(0:CTE_OS_NT) (double)   (E) : Pourcentage d'aerosols par niveau.
+C     YDEL(0:CTE_OS_NT) (double)   (E) : Pourcentage de molecules par niveau.
+C
+C     ZPROF(0:CTE_OS_NT) (double)   (E) : Altitudes des niveau.
+C
 C     RON (double)   (E) : Facteur de depolarisation (moleculaire).
-C     ALPHA(0:SOS_OS_NB_MAX) (double)   (E) : Parametres alpha(k).
-C     BETA(0:SOS_OS_NB_MAX)  (double)   (E) : Parametres beta(k).
-C     GAMMA(0:SOS_OS_NB_MAX) (double)   (E) : Parametres gamma(k).
-C     ZETA(0:SOS_OS_NB_MAX)  (double)   (E) : Parametres zeta(k).
-C     IOUT  (I4)   (E) : Type de simulation :
-C                       = -1 =>  Sortie standard:
-C                                Luminance emergeante au TOA
-C                                + descendante au niveau du sol.
-C                       = n =>  Luminance montante et descendante
-C                               pour le niveau n (0 <= n <= SOS_OS_NT).
+C
+C     ALPHA(0:CTE_OS_NB_MAX) (double)   (E) : ParamÃ¨tres alpha(k).
+C     BETA(0:CTE_OS_NB_MAX)  (double)   (E) : ParamÃ¨tres beta(k).
+C     GAMMA(0:CTE_OS_NB_MAX) (double)   (E) : ParamÃ¨tres gamma(k).
+C     ZETA(0:CTE_OS_NB_MAX)  (double)   (E) : ParamÃ¨tres zeta(k).
+C
+C     ZOUT (F9)	: (E) Altitude du niveau de sortie
+C			  -1 =>  Sortie standard:
+C				 Luminance emergeante au TOA
+C				 + descendante au niveau du sol.
+C			  z =>  Luminance montante et descendante
+C				pour l'altitude z (0 <= z <= CTE_TOA_ALT).	
+C		
 C     IGMAX  (I4)   (E) : Ordre maximal de diffusion.
-C     IBORM  (I4)   (E) : Ordre maximal du developpement en series de Fourier
+C
+C     IBORM  (I4)   (E) : Ordre maximal du dÃ©veloppement en series de Fourier
 C                         en cours de traitement :
-C                         _ 2 pour une atmosphere purement moleculaire,
-C                         _ OS_NB en presence d'aerosols.
+C                            2 pour une atmosphere purement moleculaire,
+C                            OS_NB en presence d'aerosols.
+C
 C     IPOLAR  (I4)   (E) : Option de simulation sans polarisation.
-C      			   _ 0 : calculs sans polarisation.
-C			   _ 1 : calculs normaux avec polarisation.
-C     TRACE (logical)   (E) : = vrai,si ecriture dans le fichier trace
+C      			 0 : calculs sans polarisation.
+C			        1 : calculs normaux avec polarisation.
+C
+C     TRACE (logical)   (E) : = vrai,si Ã©criture dans le fichier trace
 C                               (No d'unite logique du fichier trace =99)
-C     EMOINS (double)   (S) : Flux diffus eclairant le sol, normalise par
-C			      le flux solaire incident au TOA.
+C     IDLOG (I4) : (E) Identifiant du fichier log
+C
+C     EMOINS (double)   (S) : Flux diffus eclairant le sol, normalisÃ© par
+C			         le flux solaire incident au TOA.
+C
+C     EPLUS (double)   (S) : Flux diffus montant au TOA, normalisÃ© par
+C			        le flux solaire incident au TOA.
+C
 C     IER  (I4)   (S) : code d'erreur =0 si pas d'erreur, =-1 sinon 
 C
 C
@@ -189,24 +241,24 @@ C       Fichier binaire non formatte, cree par SOS_SURFACE
 C       Il contient la matrice de reflexion de surface 
 C       (fichier Glitter ou autres BRDF/BPDF):
 C       c'est a dire les elements Rij de la matrice de reflexion 
-C              R11(NBMU,NBMU) (reel),
-C              R12(NBMU,NBMU) (reel),
-C              R13(NBMU,NBMU) (reel),
-C              R21(NBMU,NBMU) (reel),
-C              R22(NBMU,NBMU) (reel),
-C              R23(NBMU,NBMU) (reel),
-C              R31(NBMU,NBMU) (reel),
-C              R32(NBMU,NBMU) (reel),
-C              R33(NBMU,NBMU) (reel)
+C              R11(NBMU,NBMU) (rÃ©el),
+C              R12(NBMU,NBMU) (rÃ©el),
+C              R13(NBMU,NBMU) (rÃ©el),
+C              R21(NBMU,NBMU) (rÃ©el),
+C              R22(NBMU,NBMU) (rÃ©el),
+C              R23(NBMU,NBMU) (rÃ©el),
+C              R31(NBMU,NBMU) (rÃ©el),
+C              R32(NBMU,NBMU) (rÃ©el),
+C              R33(NBMU,NBMU) (rÃ©el)
 C
-C        --> Enregistrements sur le domaine limite aux angles utiles
+C        --> Enregistrements sur le domaine limitÃ© aux angles utiles
 C                                   --------------------------------
 C
 C   -->Contenu du fichier resultat des OS
 C       Fichier binaire non formatte, cree par SOS_OS
-C       Il contient les parametres de Stokes Q , U et I pour un ordre S
-C       du developpement en series de Fourier, en fonction de l'angle mu
-C       (valeurs en double precision).
+C       Il contient les paramÃ¨tres de Stokes Q , U et I pour un ordre S
+C       du dÃ©veloppement en series de Fourier, en fonction de l'angle mu
+C       (valeurs en double prÃ©cision).
 C
 C Common utilise:
 C --------------
@@ -216,11 +268,11 @@ C Cas d'erreur :
 C ------------
 C     -Ouverture d'un fichier
 C       Erreur si le fichier de surface n'existe pas
-C     -Lecture/ecriture dans un fichier
+C     -Lecture/Ã©criture dans un fichier
 C     -Incoherence du niveau de sortie dans le profil atmospherique
 C     -Erreur dans une routine appelee
 C
-C     Affichage d'un message a l'ecran, la routine interrompt ses calculs et 
+C     Affichage d'un message Ã  l'Ã©cran, la routine interrompt ses calculs et 
 C     retour du status -1 au programme appelant
 C
 C     Remarque : Si le fichier resultat des OS existe deja, il est ecrase
@@ -242,17 +294,18 @@ C      - SOS_FSOURCE_ORDRE1
 C      - SOS_FSOURCE_ORDREIG
 C      - SOS_FSOURCE_DIFF_FRESNEL1 
 C      - SOS_PARAM_CONV 
-C      - SOS_ARRET_DIFFUS
+C      - SOS_ARRET_DIFFUS_1
+C      - SOS_ARRET_DIFFUS_2
 C      - SOS_ARRET_FOURIER
 C      - SOS_AJOUT_QUEUE
 C
 C===========================================================================
-      SUBROUTINE SOS_OS(NBMU,RMU,GA,OS_NB,
+      SUBROUTINE SOS_OS(NBMU,RMU,GA,OS_NB,NT,
      &                  FICSURF,FICOS,
      &                  N0,TETAS,RO,IMAT_SURF,IFRESNEL,IND_SURF,
-     &                  H,XDEL,YDEL,RON,
-     &                  ALPHA,BETA,GAMMA,ZETA,IOUT,IGMAX,IBORM,
-     &                  IPOLAR,TRACE,EMOINS,IER)
+     &                  H,XDEL,YDEL,ZPROF,RON,
+     &                  ALPHA,BETA,GAMMA,ZETA,ZOUT,IGMAX,IBORM,
+     &                  IPOLAR,TRACE,IDLOG,EMOINS,EPLUS,IER)
 
       IMPLICIT NONE
 
@@ -260,38 +313,53 @@ C===========================================================================
 C* Definition des variables   
 C*------------------------------------------------------
 				
-      DOUBLE PRECISION TETAS	! Angle zenithal solaire en degres (0 < tetas < 90).
-      				! (angle complementaire : mus= -cos(tetas))
-      				! (N0 < 0 => pour en tenir compte).
+      DOUBLE PRECISION TETAS ! Angle zenithal solaire en degrÃ©s (0 < tetas < 90).
+      				 ! (angle complementaire : mus= -cos(tetas))
+      				 ! (N0 < 0 => pour en tenir compte).
 	
-      DOUBLE PRECISION RO	! Albedo de surface.
+      DOUBLE PRECISION RO	! AlbÃ©do de surface.
 	
-      DOUBLE PRECISION IND_SURF  ! Indice de refraction surface / atmosphere.
+      DOUBLE PRECISION IND_SURF  ! Indice de rÃ©fraction surface / atmosphere.
       				
-      DOUBLE PRECISION H(0:SOS_OS_NT)	  !Epaisseur optique pour chaque niveau.
-      DOUBLE PRECISION XDEL(0:SOS_OS_NT)  !Pourcentage d'aerosols par niveau.
-      DOUBLE PRECISION YDEL(0:SOS_OS_NT)  !Pourcentage de molecules par niveau.
+      DOUBLE PRECISION H(0:CTE_OS_NT)	!Epaisseur optique pour chaque niveau.
+      DOUBLE PRECISION XDEL(0:CTE_OS_NT)  !Pourcentage d'aerosols par niveau.
+      DOUBLE PRECISION YDEL(0:CTE_OS_NT)  !Pourcentage de molecules par niveau.
+      DOUBLE PRECISION ZPROF(0:CTE_OS_NT) !Altitudes des niveaux du profil
 
       DOUBLE PRECISION RON	! Facteur de depolarisation (moleculaire).
 
-      DOUBLE PRECISION ALPHA(0:SOS_OS_NB_MAX)	! Parametres alpha(k).
-      DOUBLE PRECISION BETA(0:SOS_OS_NB_MAX)	! Parametres beta(k).
-      DOUBLE PRECISION GAMMA(0:SOS_OS_NB_MAX)	! Parametres gamma(k).
-      DOUBLE PRECISION ZETA(0:SOS_OS_NB_MAX)	! Parametres zeta(k).
+      DOUBLE PRECISION ALPHA(0:CTE_OS_NB_MAX)	! ParamÃ¨tres alpha(k).
+      DOUBLE PRECISION BETA(0:CTE_OS_NB_MAX)	! ParamÃ¨tres beta(k).
+      DOUBLE PRECISION GAMMA(0:CTE_OS_NB_MAX)	! ParamÃ¨tres gamma(k).
+      DOUBLE PRECISION ZETA(0:CTE_OS_NB_MAX)	! ParamÃ¨tres zeta(k).
 
         				
-      DOUBLE PRECISION I3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      				! Parametre de Stokes I pour un ordre S
-      				! du developpement en series de Fourier,
+      DOUBLE PRECISION I3ZOUT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				! ParamÃ¨tre de Stokes I pour un ordre S
+      				! du dÃ©veloppement en series de Fourier,
 				! en fonction de l'angle mu.
-      DOUBLE PRECISION Q3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      				! Parametre de Stokes Q.
-      DOUBLE PRECISION U3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      				! Parametre de Stokes U.
+				! Aux altitudes de sortie
+      DOUBLE PRECISION Q3ZOUT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				! ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3ZOUT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				! ParamÃ¨tre de Stokes U.
 
-      DOUBLE PRECISION RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
+      DOUBLE PRECISION I3OUT(0:CTE_OS_NT,
+     & 			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				! ParamÃ¨tre de Stokes I pour un ordre S
+      				! du dÃ©veloppement en series de Fourier,
+				! en fonction de l'angle mu.
+				! Pour chaque niveau du profil atmospherique
+      DOUBLE PRECISION Q3OUT(0:CTE_OS_NT,
+     & 			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				! ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3OUT(0:CTE_OS_NT,
+     & 			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				! ParamÃ¨tre de Stokes U.
+
+      DOUBLE PRECISION RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
                                                ! Tableau des mu de Gauss.
-      DOUBLE PRECISION GA(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   
+      DOUBLE PRECISION GA(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   
                                                ! Tableau des poids de Gauss.
 
       DOUBLE PRECISION RRMU	! Double inversion de mu.
@@ -299,23 +367,25 @@ C*------------------------------------------------------
       DOUBLE PRECISION TAB      ! Valeur du cosinus de l'angle zenithal 
                                 ! solaire (mus).
 
+      DOUBLE PRECISION  ZZ      ! Coefficient d'interpolation lineaire entre 2 altitudes	    
+
 C*  - Reflexion lambertienne						
-      DOUBLE PRECISION XR(0:SOS_OS_NBMU_MAX) ! champ de luminance de reflexion 
-                                         ! lambertienne au sol.
+      DOUBLE PRECISION XR(0:CTE_OS_NBMU_MAX) ! champ de luminance de reflexion 
+                                             ! lambertienne au sol.
 
       DOUBLE PRECISION LSOL   ! Luminance de reflexion lambertienne au sol.	
 
 C*  - Contribution de la reflexion directe de surface (BRDF/BPDF) 
 C*    sur le signal au TOA et pour le niveau de sortie choisi
-      DOUBLE PRECISION RII(SOS_OS_NBMU_MAX)	     ! Contribution pour I TOA. 	
-      DOUBLE PRECISION RQQ(SOS_OS_NBMU_MAX)	     ! Contribution pour Q TOA.
-      DOUBLE PRECISION RUU(SOS_OS_NBMU_MAX)	     ! Contribution pour U TOA.
-      DOUBLE PRECISION RIIOUT(SOS_OS_NBMU_MAX)   ! Contribution pour I 
-                                             ! au niveau de sortie. 
-      DOUBLE PRECISION RQQOUT(SOS_OS_NBMU_MAX)   ! Contribution pour Q 
-                                             ! au niveau de sortie
-      DOUBLE PRECISION RUUOUT(SOS_OS_NBMU_MAX)   ! Contribution pour U 
-                                             ! au niveau de sortie.
+      DOUBLE PRECISION RII(CTE_OS_NBMU_MAX)	     ! Contribution pour I TOA. 	
+      DOUBLE PRECISION RQQ(CTE_OS_NBMU_MAX)	     ! Contribution pour Q TOA.
+      DOUBLE PRECISION RUU(CTE_OS_NBMU_MAX)	     ! Contribution pour U TOA.
+      DOUBLE PRECISION RIIOUT(0:CTE_OS_NT,CTE_OS_NBMU_MAX)   ! Contribution pour I 
+                                             		     ! a chaque niveau de profil. 
+      DOUBLE PRECISION RQQOUT(0:CTE_OS_NT,CTE_OS_NBMU_MAX)   ! Contribution pour Q 
+                                             		     ! a chaque niveau de profil
+      DOUBLE PRECISION RUUOUT(0:CTE_OS_NT,CTE_OS_NBMU_MAX)   ! Contribution pour U 
+                                             		     ! a chaque niveau de profil
 
       DOUBLE PRECISION A	! Transmission dans la direction de visee
       				! entre le sol et le niveau de sortie.
@@ -323,101 +393,99 @@ C*    sur le signal au TOA et pour le niveau de sortie choisi
       DOUBLE PRECISION RR	! Attenuation du faisceau solaire direct au sol
       				! divisee par mus.
 
-      DOUBLE PRECISION F11(0:SOS_OS_NBMU_MAX)  ! Element de la matrice de Fresnel.
-      DOUBLE PRECISION F12(0:SOS_OS_NBMU_MAX)  ! Element de la matrice de Fresnel.
-      DOUBLE PRECISION F33(0:SOS_OS_NBMU_MAX)  ! Element de la matrice de Fresnel.
+      DOUBLE PRECISION F11(0:CTE_OS_NBMU_MAX)  ! ElÃ©ment de la matrice de Fresnel.
+      DOUBLE PRECISION F12(0:CTE_OS_NBMU_MAX)  ! ElÃ©ment de la matrice de Fresnel.
+      DOUBLE PRECISION F33(0:CTE_OS_NBMU_MAX)  ! ElÃ©ment de la matrice de Fresnel.
 
 C*  - Pour la diffusion moleculaire :         	
-      DOUBLE PRECISION BETA0	! Coefficients du developpement de la matrice 
+      DOUBLE PRECISION BETA0	! Coefficients du dÃ©veloppement de la matrice 
       DOUBLE PRECISION BETA2	! de phase moleculaire en fonctions de Legendre
       DOUBLE PRECISION GAMMA2	
       DOUBLE PRECISION ALPHA2	
 
-      DOUBLE PRECISION AAA	! Facteur correctif de la depolarisation 
-                                ! des molecules.
+      DOUBLE PRECISION AAA	! Facteur correctif de la depolarisation des molecules.
 
-      DOUBLE PRECISION XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction de Legendre PSL � l'ordre L=2 et S=IS
+      DOUBLE PRECISION XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction de Legendre PSL Ã  l'ordre L=2 et S=IS
       			! en fonction de l'angle mu.     		
-      DOUBLE PRECISION XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction RSL a l'ordre L=2 et S=IS en fonction de mu.
-      DOUBLE PRECISION XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction TSL a l'ordre L=2 et S=IS en fonction de mu.
+      DOUBLE PRECISION XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction RSL Ã  l'ordre L=2 et S=IS en fonction de mu.
+      DOUBLE PRECISION XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction TSL Ã  l'ordre L=2 et S=IS en fonction de mu.
 
 C*  - Pour la diffusion aerosol :
-	! Element Pij de la matrice de phase des aerosols pour un ordre
+	! ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 	! IS de la decomposition en series de Fourier.
 	! Soit mup la direction d'incidence (-1 < mup < 1)
 	! et mu celle de diffusion (-1 < mu < 1),
 	! la diffusion est exprimee par Pij(mu,mup).	
       DOUBLE PRECISION 
-     &    BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! Element P11.
+     &    BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! ElÃ©ment P11.
       DOUBLE PRECISION 
-     &    GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! P12 ou P21.
+     &    GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! P12 ou P21.
       DOUBLE PRECISION 
-     &    GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! -P13 ou -P31.
+     &    GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! -P13 ou -P31.
       DOUBLE PRECISION 
-     &    ARR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! P22.
+     &    ARR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! P22.
       DOUBLE PRECISION 
-     &    ART(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! -P23 ou -P32.
+     &    ART(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! -P23 ou -P32.
       DOUBLE PRECISION 
-     &    ATT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! P33.
+     &    ATT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! P33.
 
-      DOUBLE PRECISION CH(0:SOS_OS_NT)	! Attenuation du faisceau solaire 
-                                        ! direct / 4 pour le melange aerosols
-					! + molecules 
+      DOUBLE PRECISION CH(0:CTE_OS_NT)  ! Attenuation du faisceau solaire 
+                                        ! direct / 4 pour le melange aerosols + molecules 
 
 C* Variables associees a l'integration spatiale et verticale : 
       	! Champ de luminance d'ordre IG-1 ou IG en fonction du niveau du profil
 	! et de la direction.       	
-      DOUBLE PRECISION I1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ I.
-      DOUBLE PRECISION Q1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ Q.
-      DOUBLE PRECISION U1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ U.
+      DOUBLE PRECISION I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ I.
+      DOUBLE PRECISION Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ Q.
+      DOUBLE PRECISION U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ U.
 
       DOUBLE PRECISION 
-     &    I1fresnel(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+     &    I1fresnel(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
       			! Champ I pour la diffusion primaire de la
 			! lumiere du rayonnement solaire remontant 
 			! apres une reflexion directe sur mer plate,  
 			! selon les lois de Fresnel.
       DOUBLE PRECISION 
-     &    Q1fresnel(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+     &    Q1fresnel(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       			! Champ Q.
       DOUBLE PRECISION 
-     &    U1fresnel(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+     &    U1fresnel(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       			! Champ U.
       
 	! Vecteur fonction source en fonction du niveau du profil
 	! et de la direction.
-      DOUBLE PRECISION I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour I.
-      DOUBLE PRECISION Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour Q.
-      DOUBLE PRECISION U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour U.
 
 C* Variable associee aux tests de sorties de boucles :
       DOUBLE PRECISION Z1	! Variable seuil pour les tests d'arret.
      	
 C*  - Boucle sur l'ordre de la decomposition en series de Fourier :
-	! Tableaux de sommation des ordres S de la decomposition
+	 ! Tableaux de sommation des ordres S de la decomposition
         ! en series de Fourier, en fonction de l'angle mu.
-      DOUBLE PRECISION I4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      DOUBLE PRECISION Q4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      DOUBLE PRECISION U4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+      DOUBLE PRECISION I4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      DOUBLE PRECISION U4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
 
         ! Tableaux de sommation des ordres S de la decomposition
         ! en series de Fourier, avec permutation du signe des ordres S,
-	! en fonction de l'angle mu.
-      DOUBLE PRECISION I5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      DOUBLE PRECISION Q5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      DOUBLE PRECISION U5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+	 ! en fonction de l'angle mu.
+      DOUBLE PRECISION I5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      DOUBLE PRECISION U5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
 
       DOUBLE PRECISION SIGN	! Valeur 1 ou -1.
       DOUBLE PRECISION COEF	! Coefficient 1 ou 2.
@@ -425,57 +493,65 @@ C*  - Boucle sur l'ordre de la decomposition en series de Fourier :
 C*  - Boucle sur les diffusions :
 	! Fonctions pour le test de convergence en series geometrique,
 	! champ emergeant au TOA (mu > 0) et descendant au sol (mu < 0).
-	! Les fonctions sont etablies pour un ordre S du developpement
+	! Les fonctions sont etablies pour un ordre S du dÃ©veloppement
 	! en series de Fourier, en fonction de l'angle mu.	
-      DOUBLE PRECISION I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)		
-                                ! Parametre de Stokes I pour le cumul des
+      DOUBLE PRECISION I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)		
+                            ! ParamÃ¨tre de Stokes I pour le cumul des
       				! ordres de diffusion precedent IG en cours.
-      DOUBLE PRECISION Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes Q.
-      DOUBLE PRECISION U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes U.
+      DOUBLE PRECISION Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes U.
             			
-      DOUBLE PRECISION A1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-       				! Parametre de Stokes I pour l'ordre IG-2 
+      DOUBLE PRECISION A1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+       			! ParamÃ¨tre de Stokes I pour l'ordre IG-2 
 				! du champ emergeant au TOA (mu>0),
 				! ou descendant au niveau du sol (mu<0). 
-      DOUBLE PRECISION B1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG-2.
-      DOUBLE PRECISION C1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes U pour l'ordre IG-2.
+      DOUBLE PRECISION B1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG-2.
+      DOUBLE PRECISION C1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes U pour l'ordre IG-2.
 
-      DOUBLE PRECISION D1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG-1.	
-      DOUBLE PRECISION E1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG-1.
-      DOUBLE PRECISION F1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG-1.
+      DOUBLE PRECISION D1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG-1.	
+      DOUBLE PRECISION E1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+      DOUBLE PRECISION F1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 
-      DOUBLE PRECISION G1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG.	
-      DOUBLE PRECISION H1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG.
-      DOUBLE PRECISION P1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG.
+      DOUBLE PRECISION G1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG.	
+      DOUBLE PRECISION H1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG.
+      DOUBLE PRECISION P1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG.
 
 	! Memes fonctions pour le niveau de sortie des resultats:
-      DOUBLE PRECISION D1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG-1.	
-      DOUBLE PRECISION E1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG-1.
-      DOUBLE PRECISION F1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG-1.
+      DOUBLE PRECISION D1OUT(0:CTE_OS_NT,
+     & 			 -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG-1.	
+      DOUBLE PRECISION E1OUT(0:CTE_OS_NT,
+     &			        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+      DOUBLE PRECISION F1OUT(0:CTE_OS_NT,
+     &			        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 
-      DOUBLE PRECISION G1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG.	
-      DOUBLE PRECISION H1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG.
-      DOUBLE PRECISION P1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG.
+      DOUBLE PRECISION G1OUT(0:CTE_OS_NT,
+     &			        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG.	
+      DOUBLE PRECISION H1OUT(0:CTE_OS_NT,
+     &			        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG.
+      DOUBLE PRECISION P1OUT(0:CTE_OS_NT,
+     &  		        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG.
 
-      DOUBLE PRECISION EMOINS	! Flux diffus eclairant le sol, normalise par
-      				! le flux solaire incident au TOA.
-      DOUBLE PRECISION EPLUS	! Flux diffus emergeant au TOA de l'atmosphere.
+      DOUBLE PRECISION EMOINS	! Flux diffus eclairant le sol, normalisÃ© par
+      					! le flux solaire incident au TOA.
+
+      DOUBLE PRECISION EPLUS	! Flux diffus emergeant au TOA, normalisÃ© par
+      					! le flux solaire incident au TOA.
 
       DOUBLE PRECISION II2 	! Valeur intermediaire pour le calcul de I2 
                                 ! (mu > 0).
@@ -487,31 +563,32 @@ C*  - Boucle sur les diffusions :
       DOUBLE PRECISION XQ1	! Valeur de Q du champ montant d'ordre IG-1.
       DOUBLE PRECISION XU1	! Valeur de U du champ montant d'ordre IG-1.
 
-      DOUBLE PRECISION Z	! Valeur ponctuelle du tableau des poids 
-                                ! de Gauss.
+      DOUBLE PRECISION Z	! Valeur ponctuelle du tableau des poids de Gauss.
 
 
-C*  - Elements Rij de la matrice de reflexion de surface
-      REAL*4 R11(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R12(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R13(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R21(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R22(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R23(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R31(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R32(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
-      REAL*4 R33(SOS_OS_NBMU_MAX,SOS_OS_NBMU_MAX)
+C*  - ElÃ©ments Rij de la matrice de reflexion de surface
+      REAL*4 R11(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R12(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R13(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R21(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R22(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R23(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R31(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R32(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
+      REAL*4 R33(CTE_OS_NBMU_MAX,CTE_OS_NBMU_MAX)
 
 								
-      CHARACTER*SOS_LENFIC2 FICSURF  ! Fichier contenant la matrice de reflexion
-      				     ! de surface (fichier Glitter ou autres BRDF/BPDF).
+      CHARACTER*CTE_LENFIC2 FICSURF  ! Fichier contenant la matrice de reflexion
+      				         ! de surface (fichier Glitter ou autres BRDF/BPDF).
 
-      CHARACTER*SOS_LENFIC2 FICOS    ! Nom du fichier resultat des OS.
+      CHARACTER*CTE_LENFIC2 FICOS    ! Nom du fichier resultat des OS.
       
 
-      LOGICAL TRACE        ! = vrai,si ecriture dans le fichier trace
+      LOGICAL TRACE     ! = vrai,si Ã©criture dans le fichier trace
 
-      INTEGER*4 OS_NB 		! Ordre max des developpements des fonctions de phase 
+      INTEGER*4 NT	   ! Nombre de couches du profil atmospherique
+      
+      INTEGER*4 OS_NB 	! Ordre max des dÃ©veloppements des fonctions de phase 
 				! en Polynomes de Legendre.
 
       INTEGER*4 N0		! Numero de mu de Gauss pour l'angle
@@ -520,49 +597,51 @@ C*  - Elements Rij de la matrice de reflexion de surface
 				! (N0 > 0 => pour en tenir compte).
                
       INTEGER*4 IMAT_SURF ! Option de BRDF / BPDF de surface :
-      			  !   0 : surface lambertienne d'albedo RHO.
-			  !   1 : surface lambertienne + Glitter.
-			  !   2 : surface lambertienne + reflexion de Fresnel.
-		          !   3 : surface lambertienne + BRDF de Roujean.
-			  !   4 : surface lambertienne + BRDF de Roujean + BPDF de Rondeaux.
-			  !   5 : surface lambertienne + BRDF de Roujean + BPDF de Breon.
-			  !   6 : surface lambertienne + BRDF de Roujean + BPDF de Nadal.
+      			     !   0 : surface lambertienne d'albÃ©do RHO.
+			     !   1 : surface lambertienne + Glitter.
+			     !   2 : surface lambertienne + reflexion de Fresnel.
+		            !   3 : surface lambertienne + BRDF de Roujean.
+			     !   4 : surface lambertienne + BRDF de Roujean + BPDF de Rondeaux.
+			     !   5 : surface lambertienne + BRDF de Roujean + BPDF de Breon.
+			     !   6 : surface lambertienne + BRDF de Roujean + BPDF de Nadal.
+			     !   7 : surface lambertienne + BRDF de Roujean + BPDF de Maignan.
 			  
       INTEGER*4 IFRESNEL ! Indice precisant si les simulations
-      			 ! introduisent la reflexion de Fresnel sur mer plate :
-			 !    1 => pour un calcul de la reflexion de Fresnel.
-			 !    Sinon => pas de prise en compte.            
+      			    ! introduisent la reflexion de Fresnel sur mer plate :
+			    !    1 => pour un calcul de la reflexion de Fresnel.
+			    !    Sinon => pas de prise en compte.            
 			 
-      INTEGER*4 IOUT	! Type de simulation :
-			!   = -1 =>  Sortie standard:
-			!            Luminance emergeante au TOA
-			!          + descendante au niveau du sol.
-			!   =  n =>  Luminance montante et descendante
-			!            pour le niveau n (0 <= n <= SOS_OS_NT).
+      DOUBLE PRECISION ZOUT	! Type de sortie :
+				!      -1 =>  Sortie standard:
+				!             Luminance emergeante au TOA
+				!           + descendante au niveau du sol.
+				!       z =>  Luminance montante et descendante
+				!             pour l'altitude z (0 <= z <= CTE_TOA_ALT).
+			
  	
       INTEGER*4 IGMAX	! Ordre maximal de diffusion.
       
-      INTEGER*4 IBORM	! Ordre maximal du developpement en series de Fourier
-      			!  en cours de traitement :
-			!   _ 2 pour une atmosphere purement moleculaire,
-			!   _ OS_NB en presence d'aerosols.
+      INTEGER*4 IBORM	! Ordre maximal du dÃ©veloppement en series de Fourier
+      			       !  en cours de traitement :
+			       !   _ 2 pour une atmosphere purement moleculaire,
+			       !   _ OS_NB en presence d'aerosols.
 
       INTEGER*4 IPOLAR	! Option de simulation sans polarisation.
-      			! 0 : calculs sans polarisation.
-			! 1 : calculs normaux avec polarisation.
+      			       ! 0 : calculs sans polarisation.
+			       ! 1 : calculs normaux avec polarisation.
 			
       INTEGER*4 JK	! Numero de stockage de mus dans le tableau RMU
       			! (0 par defaut).
 
-      INTEGER*4 NUP_OUT	   ! Niveau de sortie de I, Q et U pour le 
+      INTEGER*4 NUP_OUT    ! Niveau de sortie de I, Q et U pour le 
                            ! champ montant.
       INTEGER*4 NDOWN_OUT  ! Niveau de sortie de I, Q et U pour le 
                            ! champ descendant.
 
-      INTEGER*4 IS	   ! Ordre en cours du developpement en series 
+      INTEGER*4 IS	      ! Ordre en cours du dÃ©veloppement en series 
                            ! de Fourier associe a la matrice de phase
 			   
-      INTEGER*4 IG	   ! Ordre d'interaction en cours 
+      INTEGER*4 IG	      ! Ordre d'interaction en cours 
                            ! (diffusion + reflexion).
 								
       INTEGER*4 IER        !code d'erreur =0 si pas d'erreur, =-1 sinon
@@ -571,10 +650,13 @@ C*  - Elements Rij de la matrice de reflexion de surface
       
       INTEGER*4 NBMU       ! nombre d'angles utiles	
 
+      INTEGER*4 IDLOG      ! Numero identifiant du fichier Trace	    
+
 C* Initialisation du code d'erreur
 C------------------------------------------------------
       IER=0
-
+      
+       
 C* Ouverture des fichiers 
 C------------------------------------------------------
 C     Fichier BRDF / BPDF de surface
@@ -586,10 +668,11 @@ C     Fichier BRDF / BPDF de surface
      
 C     Fichier resultat des OS
 C     Si ce fichier existe deja, il est ecrase par le nouveau fichier
-      OPEN(UNIT=10,FILE=FICOS,FORM='UNFORMATTED',ERR=913)
+      IF (FICOS.NE.'NO_OUTPUT') THEN
+          OPEN(UNIT=10,FILE=FICOS,FORM='UNFORMATTED',ERR=913)
+      ENDIF
 
-
-C* Prise en compte du facteur de depolarisation pour les parametres
+C* Prise en compte du facteur de depolarisation pour les paramÃ¨tres
 C* de la fonction de phase moleculaire.
 C---------------------------------------------------------------------
       AAA=RON/(2-RON)
@@ -623,7 +706,7 @@ C----------------------------------------------------------
       IF (N0.GT.0) THEN
          TAB=-RMU(N0)
       ELSE
-         TAB=-DCOS(SOS_PI*TETAS/180.)
+         TAB=-DCOS(INCTE_PI*TETAS/180.)
       ENDIF
 
 C* Stockage de mus pour l'indice 0 du tableau des mu de GAUSS (RMU).
@@ -634,82 +717,88 @@ C------------------------------------------------------------------
 C* Fichier trace 
 C------------------------------------------------------  
       IF (TRACE) THEN
-        WRITE(99,*,err=921) ' '  
-        WRITE(99,*,err=921) ' '	   
-        WRITE(99,*,err=921) 'ROUTINE OS  '
-	WRITE(99,*,err=921) '============='
-        WRITE(99,*,err=921) ' '
-        WRITE(99,*,err=921) 'PARAMETRES DE SIMULATIONS'
-	WRITE(99,*,err=921) '------------------------- '
-	WRITE(99,*,err=921)' '   
-        WRITE(99,*,err=921)' Incidence solaire '
-	WRITE(99,*,err=921)'    N0 : ',N0
+        WRITE(IDLOG,*,err=921) ' '  
+        WRITE(IDLOG,*,err=921) ' '	   
+        WRITE(IDLOG,*,err=921) 'SOS_OS SUBROUTINE'
+	 WRITE(IDLOG,*,err=921) '================='
+        WRITE(IDLOG,*,err=921) ' '
+        WRITE(IDLOG,*,err=921) 'SIMULATION PARAMETERS'
+	 WRITE(IDLOG,*,err=921) '---------------------'
+	 WRITE(IDLOG,*,err=921)' '   
+        WRITE(IDLOG,*,err=921)' Solar incidence'
+	WRITE(IDLOG,*,err=921)'    N0 : ',N0
 	IF (N0.LE.0) THEN
-	   WRITE(99,*,err=921)'    Angle zenithal solaire : ',TETAS 
+	   WRITE(IDLOG,*,err=921)'    Solar zenith angle : ',TETAS 
 	ELSE
-	   WRITE(99,*,err=921)
-     &       '    Angle zenithal solaire : ', 
-     &            DACOS(RMU(N0))*180.D+00/SOS_PI
+	   WRITE(IDLOG,*,err=921)
+     &       '    Solar zenith angle : ', 
+     &            DACOS(RMU(N0))*180.D+00/INCTE_PI
 	ENDIF
-	WRITE(99,*,err=921)'    Valeur de mus : ' ,TAB
-	WRITE(99,*,err=921)
-	WRITE(99,*,err=921)'    Transmission directe TOA -> surface : '
-	WRITE(99,*,err=921)'    (avec AOT tronquee si troncature) ',
-     &                          DEXP(H(SOS_OS_NT)/(TAB))
-        WRITE(99,*,err=921) 
+	WRITE(IDLOG,*,err=921)'    Gauss angle mus : ' ,TAB
+	WRITE(IDLOG,*,err=921)
+	WRITE(IDLOG,*,err=921)
+     &	'    Direct transmittance TOA -> surface : '
+	WRITE(IDLOG,*,err=921)
+     &'    (AOT adjusted to the truncated phase function, if any) ',
+     &                          DEXP(H(NT)/(TAB))
+        WRITE(IDLOG,*,err=921) 
         IF (IPOLAR.EQ.1) THEN
-	   WRITE(99,*,err=921)'    Simulation de la polarisation'
+	   WRITE(IDLOG,*,err=921)'    Simulation including polarization'
 	ELSE
-	   WRITE(99,*,err=921)'    Simulation SANS polarisation' 
+	   WRITE(IDLOG,*,err=921)'    Simulation WITHOUT polarization' 
 	ENDIF
-	WRITE(99,*,err=921)' ' 
-	WRITE(99,*,err=921)' Surface' 
-	WRITE(99,*,err=921)'    Albedo de surface : ',RO 
+	WRITE(IDLOG,*,err=921)' ' 
+	WRITE(IDLOG,*,err=921)' Surface' 
+	WRITE(IDLOG,*,err=921)'    Surface albedo: ',RO 
         IF (IMAT_SURF.EQ.1) THEN
-	   WRITE(99,*,err=921)'    Calcul avec BRDF / BPDF de surface'
-	   WRITE(99,*,err=921)
-     &       '    Fichier de la matrice de reflexion : ', FICSURF
+	  WRITE(IDLOG,*,err=921)
+     &   '    Simulation of a surface with BRDF / BPDF'
+	  WRITE(IDLOG,*,err=921)'    Reflection matrix file : ', FICSURF
 	ELSE
-	   WRITE(99,*,err=921)'    Pas de BRDF / BPDF de surface' 
+	  WRITE(IDLOG,*,err=921)'    No surface BRDF / BPDF ' 
 	ENDIF
 	IF (IFRESNEL.EQ.1) THEN
-	   WRITE(99,*,err=921)'    Calcul des reflexions sur mer plate'
-	   WRITE(99,*,err=921)
-     &	   '    Indice de refraction surface / atmosphere', IND_SURF  
+	  WRITE(IDLOG,*,err=921)
+     &	   '   Simulation of the reflections on a flat sea'
+	  WRITE(IDLOG,*,err=921)
+     &	   '    Surface / atmosphere refractive index', IND_SURF  
 	ELSE
-	   WRITE(99,*,err=921)'    Pas de reflexions sur mer plate' 
+	  WRITE(IDLOG,*,err=921)'    No reflection on a flat sea' 
 	ENDIF				
-	WRITE(99,*,err=921)' '
-	WRITE(99,*,err=921)' Profil atmospherique ' 
-	WRITE(99,*,err=921)'  (avec troncature si appliquee)' 
-	WRITE(99,*,err=921)'    Nombre de couches : ',SOS_OS_NT 
-	WRITE(99,*,err=921)
-     &	     '      Couche  % aerosols    % molecules   Ep. opt.'
-        DO 3 J=0,SOS_OS_NT
-	   WRITE(99,'(8X,I4,5X,F6.4,8X,F6.4,8X,F6.4)
-     &	        ',err=921) J,XDEL(J),YDEL(J),H(J)
-   3    CONTINUE
-	WRITE(99,*,err=921)' '	   
-	WRITE(99,*,err=921)'    Coefficients de la matrice de phase :'
-        WRITE(99,*,err=921) ' '  
-	WRITE(99,35,err=921)'I','ALPHA(I)','BETA(I)','GAMMA(I)',
+	WRITE(IDLOG,*,err=921)' '
+	WRITE(IDLOG,*,err=921)' Atmospheric profile ' 
+	WRITE(IDLOG,*,err=921)
+     &	   '  (adjusted to the truncated phase function, if applied)' 
+	WRITE(IDLOG,*,err=921)'    Number of layers : ',NT 
+	WRITE(IDLOG,*,err=921)
+     &	     '      Layer   % aerosols    % molecules   Opt. Thickness'
+       DO 3 J=0,NT
+	   WRITE(IDLOG,'(8X,I4,5X,F10.5,8X,F10.5,8X,F10.5)',err=921)
+     &	         J,XDEL(J),YDEL(J),H(J)
+   3   CONTINUE
+	WRITE(IDLOG,*,err=921)' '	   
+	WRITE(IDLOG,*,err=921)
+     &  '   Coefficients of the aerosol phase matrix:'
+       WRITE(IDLOG,*,err=921) ' '  
+	WRITE(IDLOG,35,err=921)'I','ALPHA(I)','BETA(I)','GAMMA(I)',
      &			    'ZETA(I)'  
-        DO K=0,OS_NB
-	   WRITE(99,25,err=921) K,ALPHA(K),BETA(K),GAMMA(K),ZETA(K)
+       DO K=0,OS_NB
+	   WRITE(IDLOG,25,err=921) K,ALPHA(K),BETA(K),GAMMA(K),ZETA(K)
    	ENDDO
-	WRITE(99,*,err=921)' '	
-	WRITE(99,*,err=921)
-     &	     '    Coefficients de la matrice de phase moleculaire'
-	WRITE(99,*,err=921)'         Facteur de depolarisation : ',RON
-	WRITE(99,*,err=921)
-     &       '         Facteur correctif de la depolarisation : ',AAA
-	WRITE(99,*,err=921)'         Beta0 = ',BETA0
-	WRITE(99,*,err=921)'         Beta2 = ',BETA2	
-	WRITE(99,*,err=921)'         Gamma2 = ',GAMMA2
-	WRITE(99,*,err=921)'         Alpha2 = ',ALPHA2	
-	WRITE(99,*,err=921)' '	
-	WRITE(99,*,err=921)'RESULTATS'
-	WRITE(99,*,err=921)'---------'
+	WRITE(IDLOG,*,err=921)' '	
+	WRITE(IDLOG,*,err=921)
+     &	     '    Coefficients of the molecule phase matrix'
+	WRITE(IDLOG,*,err=921)
+     &	     '         Depolarization factor : ',RON
+	WRITE(IDLOG,*,err=921)
+     &       '         Coef F for the depolarization correction : ',AAA
+	WRITE(IDLOG,*,err=921)'         Beta0 = ',BETA0
+	WRITE(IDLOG,*,err=921)'         Beta2 = ',BETA2	
+	WRITE(IDLOG,*,err=921)'         Gamma2 = ',GAMMA2
+	WRITE(IDLOG,*,err=921)'         Alpha2 = ',ALPHA2	
+	WRITE(IDLOG,*,err=921)' '	
+	WRITE(IDLOG,*,err=921)'RESULTS'
+	WRITE(IDLOG,*,err=921)'-------'
       END IF
 
 
@@ -719,19 +808,9 @@ C------------------------------------------------------
 
 C* Test coherence du niveau de sortie dans le profil atmospherique
 C----------------------------------------------------------------
-      IF ((IOUT.LT.-1).OR.(IOUT.GT.SOS_OS_NT)) GOTO 996
-
-C* Definition des niveaux du profil pour le champ montant et descendant.
-C-----------------------------------------------------------------------
-      IF (IOUT.EQ.-1) THEN
-         NDOWN_OUT = SOS_OS_NT		!Sol.
-	 NUP_OUT = 0			!TOA.
-      ELSE
-         NDOWN_OUT = IOUT		!Niveau utilisateur.
-	 NUP_OUT = IOUT			!Niveau utilisateur.
-      ENDIF
-
-
+      IF (((ZOUT.LT.0).AND.(ZOUT.NE.-1.0)).OR.(ZOUT.GT.CTE_TOA_ALT))
+     &	  GOTO 996
+     
 
 C* Calcul des coefficients de reflexion de la matrice de Fresnel
 C---------------------------------------------------------------
@@ -740,14 +819,14 @@ C---------------------------------------------------------------
      &	                                 F11,F12,F33)
 	  
 	  IF (TRACE) THEN
-	     WRITE(99,*,err=921) 
-     &       ' Matrice de reflexion de Fresnel : '
+	     WRITE(IDLOG,*,err=921) 
+     &       ' Matrix of the Fresnel reflection: '
              DO J= 0,NBMU
-                WRITE(99,40,err=921) 
-     &		      ' Angle reflexion ',DACOS(RMU(J))*180./SOS_PI,
+                WRITE(IDLOG,40,err=921) 
+     &		      'Reflection Angle ',DACOS(RMU(J))*180./INCTE_PI,
      &	              ' F11 ',F11(J),' F12 ',F12(J),' F33 ',F33(J)   
              ENDDO
-             WRITE(99,*,err=921) ' '	   
+             WRITE(IDLOG,*,err=921) ' '	   
 	  ENDIF
 	  
       ENDIF !reflexion de Fresnel sur mer plate
@@ -755,7 +834,7 @@ C---------------------------------------------------------------
 
 C* Attenuation du faisceau solaire direct (divisee par 4).
 C------------------------------------------------------
-      DO 84 I=0,SOS_OS_NT
+      DO 84 I=0,NT
          CH(I)=DEXP(-H(I)/(-TAB))/4.
   84  CONTINUE
 
@@ -779,22 +858,29 @@ C
 C       ******  DECOMPOSITION EN SERIE DE FOURIER   ******
 C
 C--------------------------------------------------------------
+      IF (TRACE) THEN
+         WRITE (IDLOG,*,ERR=921) " " 
+	  WRITE (IDLOG,*,ERR=921) "FOURIER SERIES EXPANSION"
+	  WRITE (IDLOG,*,ERR=921) "************************"
+	  WRITE (IDLOG,*,ERR=921) " " 
+      ENDIF !Fichier Trace  
+
       SIGN=-1.
 	
 C* Boucle sur les ordres de la decomposition en series de Fourier
 C------------------------------------------------------
-      DO 24 IS=SOS_OS_IBOR,IBORM
+      DO 24 IS=CTE_OS_IBOR,IBORM
  	 
          SIGN=-SIGN
  
 C* Fichier trace 
 C------------------------------------------------------  
          IF (TRACE) THEN
-            WRITE(99,*,err=921) 
-     &       ' Ordre de la decomposition en serie de Fourier : IS = ',IS
-            WRITE(99,*,err=921) 
-     &       ' -----------------------------------------------'
-            WRITE(99,*,err=921) ' '	   
+            WRITE(IDLOG,*,err=921) 
+     &       ' Fourier series expansion order: IS = ',IS
+            WRITE(IDLOG,*,err=921) 
+     &       ' ------------------------------------------'
+            WRITE(IDLOG,*,err=921) ' '	   
          ENDIF
 
 C* Suppression du coefficient moleculaire BETA0 pour le calcul
@@ -803,16 +889,21 @@ C* ordres IS > 0.
 C--------------------------------------------------------------
          IF(IS.GT.0) BETA0=0.
 
-C* Initialisation des tableaux donnant les parametres I, Q, U 
+C* Initialisation des tableaux donnant les paramÃ¨tres I, Q, U 
 C* pour l'ordre IS de la decomposition en series de Fourier.
 C------------------------------------------------------
          DO 23 J=-NBMU,NBMU
+	 
             I3(J)=0.
             Q3(J)=0.
             U3(J)=0.
-            I3OUT(J)=0.
-            Q3OUT(J)=0.
-            U3OUT(J)=0.
+	    
+	    DO I=0,NT
+            	I3OUT(I,J)=0.
+            	Q3OUT(I,J)=0.
+            	U3OUT(I,J)=0.
+	    ENDDO
+	    
    23    CONTINUE
 
 C* Lecture des elements de la matrice de reflexion pour 
@@ -820,9 +911,9 @@ C* l'ordre IS en cours.
 C--------------------------------------------------------------
          IF (IMAT_SURF.EQ.1) THEN
 C*      Lecture des fichiers qui ont ete enregistres avec des 
-C*      bornes de tableaux limitees au dimensionnement 
+C*      bornes de tableaux limitÃ©es au dimensionnement 
 C*      utile -NBMU:NBMU         
-	     READ(12,err=920),
+	     READ(12,err=920)
      &	       ((R11(I,J),I=1,NBMU),J=1,NBMU),
      &	       ((R12(I,J),I=1,NBMU),J=1,NBMU),
      &	       ((R13(I,J),I=1,NBMU),J=1,NBMU),
@@ -868,7 +959,7 @@ C--------------------------------------------------------------
 
 C* Calcul de la fonction source de diffusion primaire : I2, Q2, U2
 C----------------------------------------------------
-         CALL SOS_FSOURCE_ORDRE1(IS,NBMU,JK,XDEL,YDEL,
+         CALL SOS_FSOURCE_ORDRE1(IS,NBMU,NT,JK,XDEL,YDEL,
      &                           BETA0,BETA2,GAMMA2,
      &                           XPL,XRL,XTL,BP,GR,GT,CH,
      &                           I2,Q2,U2)       
@@ -877,25 +968,25 @@ C----------------------------------------------------
 C* Condition limite au sol
 C-------------------------
          DO 108 K=1,NBMU
-            I1(SOS_OS_NT,K)=0.
-            Q1(SOS_OS_NT,K)=0.
-            U1(SOS_OS_NT,K)=0.
+            I1(NT,K)=0.
+            Q1(NT,K)=0.
+            U1(NT,K)=0.
             XR(K)=0.
 
 C* Reflexion lambertienne au sol. Stockage dans XR.
 C------------------------------------------------
             IF (RO.EQ.0..OR.IS.NE.0) GOTO 1022
-            I1(SOS_OS_NT,K)=-RO*TAB*DEXP(H(SOS_OS_NT)/TAB)
-            XR(K)=I1(SOS_OS_NT,K)
+            I1(NT,K)=-RO*TAB*DEXP(H(NT)/TAB)
+            XR(K)=I1(NT,K)
 
 C* Reflexion de surface avec BRDF / BPDF
 C---------------------------------------
  1022       IF (IMAT_SURF.EQ.1) THEN
-               RR = DEXP(H(SOS_OS_NT)/TAB) / RMU(K)
+               RR = DEXP(H(NT)/TAB) / RMU(K)
 
-               I1(SOS_OS_NT,K)=  I1(SOS_OS_NT,K) + R11(N0,K)*RR
-               Q1(SOS_OS_NT,K)=  R21(N0,K)*RR
-               U1(SOS_OS_NT,K)=  R31(N0,K)*RR    	
+               I1(NT,K)=  I1(NT,K) + R11(N0,K)*RR
+               Q1(NT,K)=  R21(N0,K)*RR
+               U1(NT,K)=  R31(N0,K)*RR    	
             ENDIF
 	    
   108    CONTINUE
@@ -904,7 +995,7 @@ C---------------------------------------
 C* Integration du champ de luminance montant (mu > 0) du sol au TOA.
 C* et du champ de luminance descendant (mu < 0) du TOA au sol.
 C--------------------------------------------------------------
-         CALL SOS_INTEGR_EPOPT(NBMU,RMU,H,I2,Q2,U2,I1,Q1,U1)
+         CALL SOS_INTEGR_EPOPT(NBMU,RMU,NT,H,I2,Q2,U2,I1,Q1,U1)
 
 
 
@@ -920,7 +1011,7 @@ C--------------------------------------------------------------
 
 C*   Calcul de la fonction source pour la diffusion de L1fresnel 	 
 	     CALL SOS_FSOURCE_DIFF_FRESNEL1(
-     &   	       F11(0),F12(0),XDEL,YDEL,
+     &   	         F11(0),F12(0),XDEL,YDEL,NT,
      &                 BETA0,BETA2,GAMMA2,ALPHA2,BP,GR,GT,ARR,ART,
      &                 XPL,XRL,XTL,IS,NBMU,TAB,H,I2,Q2,U2)
      
@@ -929,19 +1020,19 @@ C*   Integration sur le profil atmospherique.
 C*   Calcul du champ de luminance pour la diffusion primaire de L1fresnel.
 	 
              DO 111 K=1,NBMU
-                 I1fresnel(SOS_OS_NT,K)=0.	!Initialisation au sol.
-                 Q1fresnel(SOS_OS_NT,K)=0.
-                 U1fresnel(SOS_OS_NT,K)=0. 
+                 I1fresnel(NT,K)=0.	!Initialisation au sol.
+                 Q1fresnel(NT,K)=0.
+                 U1fresnel(NT,K)=0. 
 111	     CONTINUE
      
- 	     CALL SOS_INTEGR_EPOPT(NBMU,RMU,H,I2,Q2,U2,I1fresnel,
+ 	     CALL SOS_INTEGR_EPOPT(NBMU,RMU,NT,H,I2,Q2,U2,I1fresnel,
      &	                           Q1fresnel,U1fresnel)
      
 
 C* Sommation des termes de diffusion primaire :
 C*   - du faisceau solaire direct + reflexion lambertienne
 C*   - du faisceau solaire reflechi sur mer plate, selon les lois de Fresnel. 
-            DO 112 I=0,SOS_OS_NT
+            DO 112 I=0,NT
                DO 113 K=-NBMU,NBMU
                      I1(I,K)=I1(I,K)+I1fresnel(I,K)
                      Q1(I,K)=Q1(I,K)+Q1fresnel(I,K)
@@ -961,25 +1052,33 @@ C--------------------------------------------------------------
             RII(K)=0. 	
             RQQ(K)=0.
             RUU(K)=0.
-            RIIOUT(K)=0. 	
-            RQQOUT(K)=0.
-            RUUOUT(K)=0.
+	     DO I=0,NT
+            	RIIOUT(I,K)=0. 	
+            	RQQOUT(I,K)=0.
+            	RUUOUT(I,K)=0.
+	     ENDDO
  4325    CONTINUE
 		
          IF (IMAT_SURF.EQ.1) THEN
 
             DO 4321 K=1 , NBMU
-               A = -( H(SOS_OS_NT) - H(NUP_OUT) ) / RMU(K)
-               A= DEXP(A)
-               RIIOUT(K) = A*(I1(SOS_OS_NT,K)-XR(K))
-               RQQOUT(K) = A*Q1(SOS_OS_NT,K)
-               RUUOUT(K )= A*U1(SOS_OS_NT,K)
+	    
+	       DO I=0,NT
+	       
+                  A = -( H(NT) - H(I) ) / RMU(K)
+                  A= DEXP(A)
+                  RIIOUT(I,K) = A*(I1(NT,K)-XR(K))
+                  RQQOUT(I,K) = A*Q1(NT,K)
+                  RUUOUT(I,K )= A*U1(NT,K)
 	
-	       A = -H(SOS_OS_NT)  / RMU(K)
-               A= DEXP(A)
-	       RII(K) = A*(I1(SOS_OS_NT,K)-XR(K))
-               RQQ(K) = A*Q1(SOS_OS_NT,K)
-               RUU(K )= A*U1(SOS_OS_NT,K)
+	       ENDDO
+	       
+	       A = -H(NT)  / RMU(K)
+              A= DEXP(A)
+	       RII(K) = A*(I1(NT,K)-XR(K))
+              RQQ(K) = A*Q1(NT,K)
+              RUU(K )= A*U1(NT,K)
+	       
  4321       CONTINUE
 
          ENDIF
@@ -995,17 +1094,22 @@ C------------------------------------------------
          DO K=-NBMU,-1
 
 C* Au sol pour le test de convergence :
-            I3(K)=I1(SOS_OS_NT,K)
-	    Q3(K)=Q1(SOS_OS_NT,K)
-            U3(K)=U1(SOS_OS_NT,K)
-            D1(K)=I1(SOS_OS_NT,K)
-            E1(K)=Q1(SOS_OS_NT,K)
-            F1(K)=U1(SOS_OS_NT,K)
+            I3(K)=I1(NT,K)
+	     Q3(K)=Q1(NT,K)
+            U3(K)=U1(NT,K)
+            D1(K)=I1(NT,K)
+            E1(K)=Q1(NT,K)
+            F1(K)=U1(NT,K)
 	
 C* Au niveau de sortie des resultats :
-           I3OUT(K)=I1(NDOWN_OUT,K)
-	   Q3OUT(K)=Q1(NDOWN_OUT,K)
-           U3OUT(K)=U1(NDOWN_OUT,K)
+	   DO I=0,NT
+	   
+           	I3OUT(I,K)=I1(I,K)
+	   	Q3OUT(I,K)=Q1(I,K)
+           	U3OUT(I,K)=U1(I,K)
+	   
+	   ENDDO
+	   
          ENDDO
 
 
@@ -1015,16 +1119,21 @@ C-------------------------------------------
 
 C* Au TOA pour le test de convergence :
             I3(K)=I1(0,K)
-	    Q3(K)=Q1(0,K)
+	     Q3(K)=Q1(0,K)
             U3(K)=U1(0,K)
-	    D1(K)=I1(0,K)
+	     D1(K)=I1(0,K)
             E1(K)=Q1(0,K)
             F1(K)=U1(0,K)
 	 
-C* Au niveau de sortie des resultats : 	
-            I3OUT(K)=I1(NUP_OUT,K)
-	    Q3OUT(K)=Q1(NUP_OUT,K)
-            U3OUT(K)=U1(NUP_OUT,K)
+C* Au niveau de sortie des resultats : 
+	    DO I=0,NT	
+	    
+            	I3OUT(I,K)=I1(I,K)
+	    	Q3OUT(I,K)=Q1(I,K)
+            	U3OUT(I,K)=U1(I,K)
+	    
+	    ENDDO
+	    
          ENDDO
 
 
@@ -1045,7 +1154,7 @@ C-----------------------------------------------------------------------
 
 C* Calcul de la fonction source d'ordre IG : I2, Q2, U2
 C----------------------------------------------------
-         CALL SOS_FSOURCE_ORDREIG(IS,NBMU,XDEL,YDEL,
+         CALL SOS_FSOURCE_ORDREIG(IS,NBMU,NT,XDEL,YDEL,
      &                            BETA0,BETA2,GAMMA2,ALPHA2,
      &                            XPL,XRL,XTL,I1,Q1,U1,
      &                            BP,GR,GT,ARR,ART,ATT,GA,
@@ -1055,9 +1164,9 @@ C----------------------------------------------------
 C* Condition limite au sol
 C-------------------------
          DO 1081 K=1,NBMU
-            I1(SOS_OS_NT,K)=0.
-            Q1(SOS_OS_NT,K)=0.
-            U1(SOS_OS_NT,K)=0.
+            I1(NT,K)=0.
+            Q1(NT,K)=0.
+            U1(NT,K)=0.
             XR(K)=0.
  1081    CONTINUE	    
 
@@ -1067,7 +1176,7 @@ C* la luminance descendante d'ordre IG-1.
 C-------------------------------------------------------
          LSOL=0.
          DO 9876 J=1,NBMU
-            LSOL=LSOL+GA(J)*I1(SOS_OS_NT,-J)*RMU(J)            
+            LSOL=LSOL+GA(J)*I1(NT,-J)*RMU(J)            
  9876    CONTINUE
          LSOL=2*LSOL*RO
 
@@ -1076,7 +1185,7 @@ C--------------------------------------------------
          IF (RO.EQ.0..OR.IS.NE.0) GOTO 2121
   
          DO 2122 J=1,NBMU
-            I1(SOS_OS_NT,J) = LSOL  
+            I1(NT,J) = LSOL  
             XR(J) = LSOL
  2122    CONTINUE
 
@@ -1092,20 +1201,20 @@ C------------------------------------
 	 
                DO 961 J=1,NBMU
                   Z= GA(J)
-                  XI1 = I1(SOS_OS_NT,-J)
-                  XQ1 = Q1(SOS_OS_NT,-J)
-                  XU1 = U1(SOS_OS_NT,-J)
+                  XI1 = I1(NT,-J)
+                  XQ1 = Q1(NT,-J)
+                  XU1 = U1(NT,-J)
 
-                  II2 = II2 +Z*( XI1*R11(J,K)+XQ1*R12(J,K)+XU1*R13(J,K)) 
-                  QQ2 = QQ2 +Z*( XI1*R21(J,K)+XQ1*R22(J,K)+XU1*R23(J,K)) 
+                  II2 = II2 +Z*( XI1*R11(J,K)+XQ1*R12(J,K)+XU1*R13(J,K))
+                  QQ2 = QQ2 +Z*( XI1*R21(J,K)+XQ1*R22(J,K)+XU1*R23(J,K))
                   UU2 = UU2 +Z*( XI1*R31(J,K)+XQ1*R32(J,K)+XU1*R33(J,K))
 		  
   961          CONTINUE
 		
 C* Luminance montante au niveau du sol (ordre IG)
-               I1(SOS_OS_NT,K)=II2*RRMU +XR(K)
-               Q1(SOS_OS_NT,K)=QQ2*RRMU
-               U1(SOS_OS_NT,K)=UU2*RRMU
+               I1(NT,K)=II2*RRMU +XR(K)
+               Q1(NT,K)=QQ2*RRMU
+               U1(NT,K)=UU2*RRMU
   960       CONTINUE
 
          ENDIF
@@ -1117,13 +1226,13 @@ C------------------------------------
  
           DO 1510 K=1,NBMU
 	  
-	     I1(SOS_OS_NT,K) = I1(SOS_OS_NT,K) 
-     &            + F11(K)*I1(SOS_OS_NT,-K) + F12(K)*Q1(SOS_OS_NT,-K)
+	     I1(NT,K) = I1(NT,K) 
+     &            + F11(K)*I1(NT,-K) + F12(K)*Q1(NT,-K)
      
-             Q1(SOS_OS_NT,K) = Q1(SOS_OS_NT,K) 
-     &            + F12(K)*I1(SOS_OS_NT,-K) + F11(K)*Q1(SOS_OS_NT,-K)
+             Q1(NT,K) = Q1(NT,K) 
+     &            + F12(K)*I1(NT,-K) + F11(K)*Q1(NT,-K)
      
-             U1(SOS_OS_NT,K) = U1(SOS_OS_NT,K) + F33(K)*U1(SOS_OS_NT,-K) 
+             U1(NT,K) = U1(NT,K) + F33(K)*U1(NT,-K) 
 	     
 1510 	  CONTINUE 
 
@@ -1132,32 +1241,42 @@ C------------------------------------
 C* Integration du champ de luminance montant (mu > 0) du sol au TOA.
 C* et du champ de luminance descendant (mu < 0) du TOA au sol.
 C-------------------------------------------------------------------
-         CALL SOS_INTEGR_EPOPT(NBMU,RMU,H,I2,Q2,U2,I1,Q1,U1)
+         CALL SOS_INTEGR_EPOPT(NBMU,RMU,NT,H,I2,Q2,U2,I1,Q1,U1)
 
 C* Stockage du champ d'ordre IG.
 C------------------------------
          DO K=-NBMU,-1   
 C* Au sol pour le test de convergence :
-            G1(K)=I1(SOS_OS_NT,K)
-            H1(K)=Q1(SOS_OS_NT,K)
-            P1(K)=U1(SOS_OS_NT,K)  	
+            G1(K)=I1(NT,K)
+            H1(K)=Q1(NT,K)
+            P1(K)=U1(NT,K)  	
 	
 C* Au niveau de sortie des resultats : 	
-	    G1OUT(K)=I1(NDOWN_OUT,K)
-            H1OUT(K)=Q1(NDOWN_OUT,K)
-            P1OUT(K)=U1(NDOWN_OUT,K)
+	    DO I=0,NT
+	    
+	        G1OUT(I,K)=I1(I,K)
+               H1OUT(I,K)=Q1(I,K)
+               P1OUT(I,K)=U1(I,K)
+	    
+	    ENDDO
+	    
          ENDDO
 
          DO K=1,NBMU     
 C* Au TOA pour le test de convergence :
-	    G1(K)=I1(0,K)
+	     G1(K)=I1(0,K)
             H1(K)=Q1(0,K)
             P1(K)=U1(0,K)
 	
 C* Au niveau de sortie des resultats :
-	    G1OUT(K)=I1(NUP_OUT,K)
-	    H1OUT(K)=Q1(NUP_OUT,K)
-            P1OUT(K)=U1(NUP_OUT,K)
+	    DO I=0,NT
+
+	       G1OUT(I,K)=I1(I,K)
+	       H1OUT(I,K)=Q1(I,K)
+              P1OUT(I,K)=U1(I,K)
+	    
+	    ENDDO
+	    
          ENDDO
  
 
@@ -1168,26 +1287,26 @@ C-------------------------------------------------------------------------
          CALL SOS_PARAM_CONV(NBMU,A1,B1,C1,D1,E1,F1,G1,H1,P1,
      &                       I3,Q3,U3,Z1)
 
-C* Si on excede le seuil SOS_PH_SEUIL_CV_SG pour au moins un angle mu, 
+C* Si on excede le seuil CTE_PH_SEUIL_CV_SG pour au moins un angle mu, 
 C* on n'est pas en condition de convergence. On passe a l'ordre suivant 
 C* de diffusion.
-         IF (Z1.GT.SOS_PH_SEUIL_CV_SG) GO TO 506
+         IF (Z1.GT.CTE_PH_SEUIL_CV_SG) GO TO 506
 
 
 C* Si on est en regime de convergence, on ajoute la queue de la
 C* serie geometrique a la somme des diffusions precedentes.
 C-------------------------------------------------------
-         CALL SOS_AJOUT_QUEUE(NBMU,D1,E1,F1,G1,H1,P1,
-     &                     D1OUT,E1OUT,F1OUT,
-     &                     G1OUT,H1OUT,P1OUT,
-     &                     I3,Q3,U3,I3OUT,Q3OUT,U3OUT)
+         CALL SOS_AJOUT_QUEUE(NT,NBMU,D1,E1,F1,G1,H1,P1,
+     &                        D1OUT,E1OUT,F1OUT,
+     &                        G1OUT,H1OUT,P1OUT,
+     &                        I3,Q3,U3,I3OUT,Q3OUT,U3OUT)
 
 C* Fichier trace 
 C------------------------------------------------------  
          IF (TRACE) THEN
-            WRITE(99,*,err=921) 
-     &       '    Convergence en serie geometrique a partir de IG = ',IG
-            WRITE(99,*,err=921) ' '	   
+            WRITE(IDLOG,*,err=921) 
+     &      '    Convergence in geometric series from IG = ',IG
+            WRITE(IDLOG,*,err=921) ' '	   
          ENDIF
 
 C* On quitte la boucle sur les diffusions.
@@ -1208,44 +1327,75 @@ C-------------------------------------------------------
             D1(K)=G1(K)
             E1(K)=H1(K)
             F1(K)=P1(K)
-            D1OUT(K)=G1OUT(K)
-            E1OUT(K)=H1OUT(K)
-            F1OUT(K)=P1OUT(K)
+	    
+	    DO I=0,NT
+	    
+               D1OUT(I,K)=G1OUT(I,K)
+               E1OUT(I,K)=H1OUT(I,K)
+               F1OUT(I,K)=P1OUT(I,K)
+	    
+	    ENDDO
+	    
    86    CONTINUE
 
 C* Calcul de la somme des diffusions
 C------------------------------------
 17       DO 400 J=1,NBMU
+
             I3(J)=I3(J)+I1(0,J)
             Q3(J)=Q3(J)+Q1(0,J)
             U3(J)=U3(J)+U1(0,J)
-            I3(-J)=I3(-J)+I1(SOS_OS_NT,-J)
-            Q3(-J)=Q3(-J)+Q1(SOS_OS_NT,-J)
-            U3(-J)=U3(-J)+U1(SOS_OS_NT,-J)
+            I3(-J)=I3(-J)+I1(NT,-J)
+            Q3(-J)=Q3(-J)+Q1(NT,-J)
+            U3(-J)=U3(-J)+U1(NT,-J)
 
-            I3OUT(J)=I3OUT(J)+I1(NUP_OUT,J)
-            Q3OUT(J)=Q3OUT(J)+Q1(NUP_OUT,J)
-            U3OUT(J)=U3OUT(J)+U1(NUP_OUT,J)
-            I3OUT(-J)=I3OUT(-J)+I1(NDOWN_OUT,-J)
-            Q3OUT(-J)=Q3OUT(-J)+Q1(NDOWN_OUT,-J)
-            U3OUT(-J)=U3OUT(-J)+U1(NDOWN_OUT,-J)
+	    DO I=0,NT
+	    
+               I3OUT(I,J)=I3OUT(I,J)+I1(I,J)
+               Q3OUT(I,J)=Q3OUT(I,J)+Q1(I,J)
+               U3OUT(I,J)=U3OUT(I,J)+U1(I,J)
+               I3OUT(I,-J)=I3OUT(I,-J)+I1(I,-J)
+               Q3OUT(I,-J)=Q3OUT(I,-J)+Q1(I,-J)
+               U3OUT(I,-J)=U3OUT(I,-J)+U1(I,-J)
+	    
+	    ENDDO
+	    
   400    CONTINUE
+
+C* Test d'arret sur les diffusions quand les termes 
+C* I, Q et U sont trop petits
+C-------------------------------------------------------
+         CALL SOS_ARRET_DIFFUS_1(NBMU,NT,I1,Q1,U1,Z1)
+
+         IF (Z1.GT.CTE_PH_SEUIL_VALDIF) goto 507
+
+C* Fichier trace 
+C------------------------------------------------------  
+         IF (TRACE) THEN
+            WRITE(IDLOG,*,err=921) 
+     &        '    End of the scattering loop due to the test',
+     &        ' on I, Q, U values',
+     &        ' (too low to continue the calculations) for IG = ',IG
+            WRITE(IDLOG,*,err=921) ' '	   
+         ENDIF
+
+         GO TO 505
 
 C* Test d'arret sur les diffusions quand les termes suivant 
 C* deviennent tres petits
 C-------------------------------------------------------
-         CALL SOS_ARRET_DIFFUS(NBMU,I1,Q1,U1,I3,Q3,U3,Z1)
+  507    CALL SOS_ARRET_DIFFUS_2(NBMU,NT,I1,Q1,U1,I3,Q3,U3,Z1)
    
-         IF (Z1.GT.SOS_PH_SEUIL_SUMDIF) goto 508
+         IF (Z1.GT.CTE_PH_SEUIL_SUMDIF) goto 508
       
 C* Fichier trace 
 C------------------------------------------------------  
          IF (TRACE) THEN
-            WRITE(99,*,err=921) 
-     &        '    Sortie de la boucle sur les diffusions par le test',
-     &        '    sur l''importance de l''ordre IG devant la somme',
-     &        '    des diffusions precedentes'
-            WRITE(99,*,err=921) ' '	   
+            WRITE(IDLOG,*,err=921) 
+     &        '    End of the scattering loop due to the test',
+     &        ' comparing radiance of order IG to the accumulation',
+     &        ' of previous orders for IG = ',IG
+            WRITE(IDLOG,*,err=921) ' '	   
          ENDIF
 	 
 	 
@@ -1258,10 +1408,10 @@ C---------------------------------------------------
 C* Fichier trace 
 C------------------------------------------------------  
          IF (TRACE) THEN
-            WRITE(99,*,err=921) 
-     &       '    Sortie de la boucle sur les diffusions pour ordre',
-     &       '    maximal atteint : IGMAX = ',IGMAX
-            WRITE(99,*,err=921) ' '	   
+            WRITE(IDLOG,*,err=921) 
+     &       '    End of the scattering loop because of reaching',
+     &       '    the maximal order : IGMAX = ',IGMAX
+            WRITE(IDLOG,*,err=921) ' '	   
          ENDIF
 	 
   505    CONTINUE
@@ -1271,21 +1421,28 @@ C-----------------------------------------------------------------------
         IF (IMAT_SURF.EQ.1) THEN
 	 
             DO 5200 J=1,NBMU
+	    
                I3(J)=I3(J)-RII(J)
                Q3(J)=Q3(J)-RQQ(J)
                U3(J)=U3(J)-RUU(J)
-               I3OUT(J)=I3OUT(J)-RIIOUT(J)
-               Q3OUT(J)=Q3OUT(J)-RQQOUT(J)
-               U3OUT(J)=U3OUT(J)-RUUOUT(J)
+	       
+	       DO I=0,NT
+	       
+                  I3OUT(I,J)=I3OUT(I,J)-RIIOUT(I,J)
+                  Q3OUT(I,J)=Q3OUT(I,J)-RQQOUT(I,J)
+                  U3OUT(I,J)=U3OUT(I,J)-RUUOUT(I,J)
+	       
+	       ENDDO
+	       
  5200       CONTINUE
 
          ENDIF
 
 C* Calcul de l'eclairement diffus en haut et en bas de l'atmosphere,
-C* normalise par le flux solaire incident au TOA.
+C* normalisÃ© par le flux solaire incident au TOA.
 C*  EMOINS ==> transmission diffuse td(thetas)
 C*        si la surface est non reflechissante.
-C*  EPLUS ==> inclus les differentes reflexions surface - atmosphere.
+C*  EPLUS ==> inclus les diffÃ©rentes reflexions surface - atmosphere.
 C-------------------------------------------------------------------
          IF(IS.EQ.0) THEN
            EMOINS=0.
@@ -1294,8 +1451,8 @@ C-------------------------------------------------------------------
              EMOINS = EMOINS + RMU(J)*GA(J)*I3(-J)
              EPLUS  = EPLUS  + RMU(J)*GA(J)*I3(J)
            ENDDO
-	   EMOINS = -EMOINS*2/TAB
-	   EPLUS  = -EPLUS *2/TAB
+	    EMOINS = -EMOINS*2/TAB
+	    EPLUS  = -EPLUS *2/TAB
          ENDIF	
 
 C* Calcul des fonctions de mu I4, Q4, U4, I5, Q5 et U5:	
@@ -1306,48 +1463,116 @@ C-------------------------------------------------------
          DO 67 J=-NBMU,NBMU
             IF (J.EQ.0) GOTO 67
 	
-	    I4(J)=I4(J)+COEF*I3(J)
+	     I4(J)=I4(J)+COEF*I3(J)
             Q4(J)=Q4(J)+COEF*Q3(J)
             U4(J)=U4(J)+COEF*U3(J)
 
-	    I5(J)=I5(J)+COEF*I3(J)*SIGN
+	     I5(J)=I5(J)+COEF*I3(J)*SIGN
             Q5(J)=Q5(J)+COEF*Q3(J)*SIGN
             U5(J)=U5(J)+COEF*U3(J)*SIGN
 67       CONTINUE
 
+
+C* Definition des niveaux du profil pour le champ montant et descendant.
+C  Cas par defaut : ZOUT=-1 => niveaux TOA et surface
+C  Sinon calcul par interpolation des flux a l'altitude ZOUT
+C-----------------------------------------------------------------------
+
+C* Cas par defaut .
+C---------------------------
+
+      IF (ZOUT.EQ.-1) THEN
+      
+C* Pour le champ descendant .
+C
+	 NDOWN_OUT = NT
+         DO K=-NBMU,-1
+
+            I3ZOUT(K)=I3OUT(NDOWN_OUT,K)
+	     Q3ZOUT(K)=Q3OUT(NDOWN_OUT,K)
+            U3ZOUT(K)=U3OUT(NDOWN_OUT,K)
+	   
+         ENDDO
+      
+C* Pour le champ montant .
+C
+	 NUP_OUT = 0
+         DO K=1,NBMU
+
+            I3ZOUT(K)=I3OUT(NUP_OUT,K)
+	     Q3ZOUT(K)=Q3OUT(NUP_OUT,K)
+            U3ZOUT(K)=U3OUT(NUP_OUT,K)
+	   
+         ENDDO
+
+C* Calcul a ZOUT par interpolation .
+C-----------------------------------
+ 
+      ELSE
+      
+c Recherche du niveau d'altitude inferieur a ZOUT
+	    J=1
+	    DO WHILE(ZOUT.LT.ZPROF(J))
+		   J=J+1
+	    ENDDO
+
+C Position de l'altitude par rapport aux niveaux precendents et suivants
+	    ZZ = (ZOUT-ZPROF(J-1))/(ZPROF(J)-ZPROF(J-1))
+
+	    
+C* Calcul des champs descendants et montants
+C
+
+         DO K=-NBMU,NBMU
+
+            I3ZOUT(K)=(1-ZZ)*I3OUT(J-1,K)+ZZ*I3OUT(J,K)
+	     Q3ZOUT(K)=(1-ZZ)*Q3OUT(J-1,K)+ZZ*Q3OUT(J,K)
+            U3ZOUT(K)=(1-ZZ)*U3OUT(J-1,K)+ZZ*U3OUT(J,K)
+	   
+         ENDDO
+	 	          
+      ENDIF
+
 C* Fichier trace 
 C------------------------------------------------------  
          IF (TRACE) THEN
-            WRITE(99,*,err=921) '    Cumul de diffusion : '
-	    WRITE(99,*,err=921)	    
-     &        '       Niveau de sortie du champ montant : ',NUP_OUT
-            WRITE(99,*,err=921) 
-     &        '       Niveau de sortie du champ descendant : ',NDOWN_OUT        
-            WRITE(99,*,err=921) '  '	   	    
+            WRITE(IDLOG,*,err=921)	    
+     &        '    Scattering accumulation : IS = ',IS
+	     IF (ZOUT.EQ.-1) THEN
+	       WRITE(IDLOG,*,err=921)	    
+     &        '       Upward radiance at level   : ',NUP_OUT
+              WRITE(IDLOG,*,err=921) 
+     &        '       Downward radiance at level : ',NDOWN_OUT
+     	     ELSE
+	       WRITE(IDLOG,*,err=921)	    
+     &        '       Altitude of output radiance : ',ZOUT	    
+	     ENDIF   
+            WRITE(IDLOG,*,err=921) '  '	   	    
             DO K=1,NBMU
-              WRITE(99,20,err=921) RMU(K),
-     &                             '  ID ',I3OUT(-K),
-     &                             '  QD ',Q3OUT(-K),
-     &                             '  UD ',U3OUT(-K),	      
-     &                             '  IM ',I3OUT(K),
-     &                             '  QM ',Q3OUT(K),
-     &                             '  UM ',U3OUT(K)     
- 	    ENDDO
-            WRITE(99,*,err=921) '  '
-	    WRITE(99,*,err=921) ' '	   	    	   
+              WRITE(IDLOG,20,err=921) RMU(K),
+     &                             '  ID ',I3ZOUT(-K),
+     &                             '  QD ',Q3ZOUT(-K),
+     &                             '  UD ',U3ZOUT(-K),	      
+     &                             '  IM ',I3ZOUT(K),
+     &                             '  QM ',Q3ZOUT(K),
+     &                             '  UM ',U3ZOUT(K)     
+ 	     ENDDO
+            WRITE(IDLOG,*,err=921) '  '
+	     WRITE(IDLOG,*,err=921) ' '	   	    	   
          ENDIF
 
 
 C* Enregistrement des tableaux de luminances a l'ordre IS de 
 C* la decomposition en series de Fourier, pour le niveau du profil 
 C* requis par l'utilisateur.
-C* Bornes d'enregistrement des tableaux limitees au dimensionnement 
+C* Bornes d'enregistrement des tableaux limitÃ©es au dimensionnement 
 C* utile -NBMU:NBMU
 C--------------------------------------------------------------
-         WRITE(10,err=923)(Q3OUT(K),K=-NBMU,NBMU),
-     & 			  (U3OUT(K),K=-NBMU,NBMU),
-     &			  (I3OUT(K),K=-NBMU,NBMU)
-      
+      IF (FICOS.NE.'NO_OUTPUT') THEN
+         WRITE(10,err=923)(Q3ZOUT(K),K=-NBMU,NBMU),
+     & 		     (U3ZOUT(K),K=-NBMU,NBMU),
+     &			     (I3ZOUT(K),K=-NBMU,NBMU)
+      ENDIF      
 
 
 C* Test d'arret sur la decomposition en serie fourier
@@ -1357,7 +1582,7 @@ C-------------------------------------------------------
 C* Si au moins un terme est superieur au seuil, on passe
 C* a l'ordre IS suivant.
 C-------------------------------------------------------
-         IF (Z1.GT.SOS_PH_SEUIL_SF) GO TO 24
+         IF (Z1.GT.CTE_PH_SEUIL_SF) GO TO 24
 	 
 C* Sortie de la boucle sur IS
 C---------------------------
@@ -1373,24 +1598,24 @@ C----------------------
 C* Fichier trace 
 C------------------------------------------------------  
          IF (TRACE) THEN
-            WRITE(99,*,err=921) ' Arret de la decomposition en serie',
-     &                          ' de Fourier pour l''ordre : ',IS
-            WRITE(99,*,err=921) ' '
-	    WRITE(99,*,err=921) ' '
-	    WRITE(99,*,err=921) '    Eclairement normalise de la couche'
-            WRITE(99,*,err=921) 
-     &            '      Flux diffus eclairant le sol ', EMOINS
-            WRITE(99,*,err=921) 
-     &      '        --> inclus les multiples iterations surface / atm.'
-            WRITE(99,*,err=921)
-     &      '        --> transmission diffuse td(thetas) uniquement si '
-            WRITE(99,*,err=921)
-     &      '            la surface est non reflechissante.'
-            WRITE(99,*,err=921) 
-     &            '      Flux diffus emergeant au TOA ',EPLUS   
-            WRITE(99,*,err=921) 
-     &      '        --> inclus les multiples iterations surface / atm.'
-            WRITE(99,*,err=921) ' '	   
+            WRITE(IDLOG,*,err=921) "--> End of the Fourier series"//
+     & 				" expansion for the order : ", IS
+            WRITE(IDLOG,*,err=921) ' '
+	     WRITE(IDLOG,*,err=921) ' '
+	     WRITE(IDLOG,*,err=921)  
+     &      ' FLUX (normalized by TOA solar irradiance):'
+            WRITE(IDLOG,*,err=921) 
+     &      '      Downward diffuse flux at ground level ', EMOINS
+            WRITE(IDLOG,*,err=921) 
+     &      '        --> including multiple surface / atm. reflections'
+            WRITE(IDLOG,*,err=921)
+     &      '        --> = Diffuse transmittance td(thetas) only'//
+     &      ' for a black surface'
+            WRITE(IDLOG,*,err=921) 
+     &            '      Upward diffuse flux a at TOA ',EPLUS   
+            WRITE(IDLOG,*,err=921) 
+     &      '        --> including multiple surface / atm interactions'
+            WRITE(IDLOG,*,err=921) ' '	   
          ENDIF
 
 C* Fin nominale 
@@ -1417,7 +1642,7 @@ C----------------------------------------------------------
   923 WRITE(6,*) '  ERROR on SOS binary result file writing for SOS_OS'
       IER=-1
       goto 9999
-  996 WRITE(6,*) '  Inconsistency output level in the ',
+  996 WRITE(6,*) '  Inconsistency output altitude in the ',
      &           '  atmospheric profile'
       IER=-1
       goto 9999
@@ -1435,7 +1660,7 @@ C* Fermeture fichier
 C-------------------
       CLOSE(21)
       IF (IMAT_SURF.EQ.1) CLOSE(12)
-      CLOSE(10)
+      IF (FICOS.NE.'NO_OUTPUT') CLOSE(10)
 
 C* Format 
 C----------  
@@ -1464,23 +1689,23 @@ C           F12(mu)    F11(mu)     0
 C              0         0     F33(mu)
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C
 C     NBMU (I4) : (E) Nombre d'angles (positifs) effectivement utiles
 C
-C     RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)  Tableau des mu de Gauss.
+C     RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)  Tableau des mu de Gauss.
 C
-C     IND_SURF (double)  (E) Indice de refraction surface / atmosphere.
+C     IND_SURF (double)  (E) Indice de rÃ©fraction surface / atmosphere.
 C
 C     IPOLAR  (I4)   (E) : Option de simulation sans polarisation.
-C      			   _ 0 : calculs sans polarisation.
-C			   _ 1 : calculs normaux avec polarisation.
+C      		        0 : calculs sans polarisation.
+C			        1 : calculs normaux avec polarisation.
 C	
-C     F11(0:SOS_OS_NBMU_MAX)  (double)  (S) 
-C     F12(0:SOS_OS_NBMU_MAX)  (double)  (S)
-C     F33(0:SOS_OS_NBMU_MAX)  (double)  (S)
-C           Elements de la matrice de reflexion de Fresnel.
+C     F11(0:CTE_OS_NBMU_MAX)  (double)  (S) 
+C     F12(0:CTE_OS_NBMU_MAX)  (double)  (S)
+C     F33(0:CTE_OS_NBMU_MAX)  (double)  (S)
+C           ElÃ©ments de la matrice de reflexion de Fresnel.
 C
 C Common utilise:
 C --------------
@@ -1500,14 +1725,14 @@ C==============================================================================
 C* Definition des variables    
 C*-----------------------------------------------------------------------
 
-      DOUBLE PRECISION RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
+      DOUBLE PRECISION RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
                                                ! Tableau des mu de Gauss.
 
-      DOUBLE PRECISION IND_SURF  ! Indice de refraction surface / atmosphere.
+      DOUBLE PRECISION IND_SURF  ! Indice de rÃ©fraction surface / atmosphere.
       
-      DOUBLE PRECISION F11(0:SOS_OS_NBMU_MAX)  ! Element de la matrice de Fresnel.
-      DOUBLE PRECISION F12(0:SOS_OS_NBMU_MAX)  ! Element de la matrice de Fresnel.
-      DOUBLE PRECISION F33(0:SOS_OS_NBMU_MAX)  ! Element de la matrice de Fresnel.
+      DOUBLE PRECISION F11(0:CTE_OS_NBMU_MAX)  ! ElÃ©ment de la matrice de Fresnel.
+      DOUBLE PRECISION F12(0:CTE_OS_NBMU_MAX)  ! ElÃ©ment de la matrice de Fresnel.
+      DOUBLE PRECISION F33(0:CTE_OS_NBMU_MAX)  ! ElÃ©ment de la matrice de Fresnel.
 
 
       DOUBLE PRECISION MU   ! Valeur d'un mu de Gauss (direction de reflexion).
@@ -1518,7 +1743,7 @@ C*-----------------------------------------------------------------------
       DOUBLE PRECISION RR   ! Coefficient de reflexion perpendiculaire.
 
       INTEGER*4 NBMU    ! Nombre d'angles effectifs des simulations
-      INTEGER*4 IPOLAR	! Option de simulation avec / sans polarisation.
+      INTEGER*4 IPOLAR  ! Option de simulation avec / sans polarisation.
 			      
       INTEGER J  ! Indice 
 
@@ -1563,7 +1788,7 @@ C*===========================================================================
 C PROCEDURE: SOS_NOYAUX
 C ==========
 C      Cette procedure calcule les elements de la matrice de phase
-C      des aerosols a l'ordre IS du developpement en series de Fourier.
+C      des aerosols a l'ordre IS du dÃ©veloppement en series de Fourier.
 C      Les calculs utilisent les polynomes et fonctions de Legendre.
 C      Ces fonctions sont sorties pour un ordre L=2. Elles sont utiles
 C      pour calculer les elements de la matrice de phase des molecules.
@@ -1577,44 +1802,44 @@ C      On calcule BP(mu,mup), GR(mu,mup), GT(mu,mup), ARR(mu,mup),
 C      ART(mu,mup) et ATT(mu,mup) pour -1 < mu < 1 et pour -1 < mup < 1.
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C
 C     IS  (I4)  (E)   Ordre de la decomposition en series de Fourier.
 C     NBMU (I4) : (E) Nombre d'angles (positifs) effectivement utiles
-C     RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)  Tableau des mu de Gauss.
-C     OS_NB (I4) : (E) Ordre max des developpements des fonctions de phase 
+C     RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)  Tableau des mu de Gauss.
+C     OS_NB (I4) : (E) Ordre max des dÃ©veloppements des fonctions de phase 
 C		       en Polynomes de Legendre a utiliser.
 C
-C     ALPHA(0:SOS_OS_NB_MAX) (double)  (E)    Parametres alpha(k).
-C     BETA(0:SOS_OS_NB_MAX)  (double)  (E)    Parametres beta(k).
-C     GAMMA(0:SOS_OS_NB_MAX) (double)  (E)    Parametres gamma(k).
-C     ZETA(0:SOS_OS_NB_MAX)  (double)  (E)    Parametres zeta(k).
+C     ALPHA(0:CTE_OS_NB_MAX) (double)  (E)    ParamÃ¨tres alpha(k).
+C     BETA(0:CTE_OS_NB_MAX)  (double)  (E)    ParamÃ¨tres beta(k).
+C     GAMMA(0:CTE_OS_NB_MAX) (double)  (E)    ParamÃ¨tres gamma(k).
+C     ZETA(0:CTE_OS_NB_MAX)  (double)  (E)    ParamÃ¨tres zeta(k).
 C
-C     XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (S) 
-C      		        Fonction de Legendre PSL � l'ordre L=2
+C     XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (S) 
+C      		        Fonction de Legendre PSL Ã  l'ordre L=2
 C   		        et S=IS en fonction de l'angle mu.
-C     XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (S)
-C      		        Fonction RSL a l'ordre L=2 et S=IS.
-C     XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (S)
-C      		        Fonction TSL a l'ordre L=2 et S=IS
+C     XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (S)
+C      		        Fonction RSL Ã  l'ordre L=2 et S=IS.
+C     XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (S)
+C      		        Fonction TSL Ã  l'ordre L=2 et S=IS
 C	             Fonctions de Legendre et fonctions derivees pour le calcul
 C	             de la matrice de phase.
 C
 C	
-C     BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S) 
-C                                                        Element P11.
-C     GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S) 
-C                                                        Element P12 ou P21.
-C     GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S) 
-C                                                        Element -P13 ou -P31.
-C     ARR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (S) 
-C                                                        Element P22.
-C     ART(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (S)
-C                                                        Element -P23 ou -P32.
-C     ATT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (S) 
-C                                                        Element P33.
-C             Element Pij de la matrice de phase des aerosols pour un ordre
+C     BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S) 
+C                                                        ElÃ©ment P11.
+C     GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S) 
+C                                                        ElÃ©ment P12 ou P21.
+C     GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S) 
+C                                                        ElÃ©ment -P13 ou -P31.
+C     ARR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (S) 
+C                                                        ElÃ©ment P22.
+C     ART(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (S)
+C                                                        ElÃ©ment -P23 ou -P32.
+C     ATT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (S) 
+C                                                        ElÃ©ment P33.
+C             ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 C             IS de la decomposition en series de Fourier.
 C             Soit mup la direction d'incidence ( -1 < mup < 1)
 C             et mu celle de diffusion ( -1 < mu < 1),
@@ -1638,59 +1863,59 @@ C==============================================================================
 C* Definition des variables    
 C*-----------------------------------------------------------------------
 
-      DOUBLE PRECISION RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       				!  Tableau des mu de Gauss.
 
-      DOUBLE PRECISION ALPHA(0:SOS_OS_NB_MAX)	!  Parametres alpha(k).
-      DOUBLE PRECISION BETA(0:SOS_OS_NB_MAX)	!  Parametres beta(k).
-      DOUBLE PRECISION GAMMA(0:SOS_OS_NB_MAX)	!  Parametres gamma(k).
-      DOUBLE PRECISION ZETA(0:SOS_OS_NB_MAX)	!  Parametres zeta(k).
+      DOUBLE PRECISION ALPHA(0:CTE_OS_NB_MAX)	!  ParamÃ¨tres alpha(k).
+      DOUBLE PRECISION BETA(0:CTE_OS_NB_MAX)	!  ParamÃ¨tres beta(k).
+      DOUBLE PRECISION GAMMA(0:CTE_OS_NB_MAX)	!  ParamÃ¨tres gamma(k).
+      DOUBLE PRECISION ZETA(0:CTE_OS_NB_MAX)	!  ParamÃ¨tres zeta(k).
 
 	! Fonctions de Legendre et fonctions derivees pour le calcul
 	! de la matrice de phase.
-      DOUBLE PRECISION XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				!   Fonction de Legendre PSL � l'ordre L=2
+      DOUBLE PRECISION XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				!   Fonction de Legendre PSL Ã  l'ordre L=2
       				!   et S=IS en fonction de l'angle mu.
-      DOUBLE PRECISION XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				!   Fonction RSL a l'ordre L=2 et S=IS.
-      DOUBLE PRECISION XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				!   Fonction TSL a l'ordre L=2 et S=IS
+      DOUBLE PRECISION XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				!   Fonction RSL Ã  l'ordre L=2 et S=IS.
+      DOUBLE PRECISION XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				!   Fonction TSL Ã  l'ordre L=2 et S=IS
 							
-	! Element Pij de la matrice de phase des aerosols pour un ordre
+	! ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 	! IS de la decomposition en series de Fourier.
 	! Soit mup la direction d'incidence (-1 < mup < 1)
 	! et mu celle de diffusion (-1 < mu < 1),
 	! la diffusion est exprimee par Pij(mu,mup).	
       DOUBLE PRECISION 
-     &    BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! Element P11.
+     &    BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! ElÃ©ment P11.
       DOUBLE PRECISION 
-     &    GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! P12 ou P21.
+     &    GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! P12 ou P21.
       DOUBLE PRECISION 
-     &    GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! -P13 ou -P31.
+     &    GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! -P13 ou -P31.
       DOUBLE PRECISION 
-     &    ARR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! P22.
+     &    ARR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! P22.
       DOUBLE PRECISION 
-     &    ART(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! -P23 ou -P32.
+     &    ART(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! -P23 ou -P32.
       DOUBLE PRECISION 
-     &    ATT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! P33.
+     &    ATT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! P33.
 
 
 
       DOUBLE PRECISION 
-     &    PSL(-1:SOS_OS_NB_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
+     &    PSL(-1:CTE_OS_NB_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
       				! Fonction de Legendre PSL pour l'ordre S=IS
       				! en fonction de l'ordre L et de l'angle mu.
       DOUBLE PRECISION 
-     &    RSL(-1:SOS_OS_NB_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+     &    RSL(-1:CTE_OS_NB_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
       				! Fonction RSL.
       DOUBLE PRECISION 
-     &    TSL(-1:SOS_OS_NB_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+     &    TSL(-1:CTE_OS_NB_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
       				  ! Fonction TSL.
 
       DOUBLE PRECISION C	! Valeur ponctuelle du mu de Gauss.
@@ -1702,35 +1927,29 @@ C*-----------------------------------------------------------------------
       DOUBLE PRECISION XX	! Variable intermediaire de calcul.
       DOUBLE PRECISION YY	! Variable intermediaire de calcul.
 
-      DOUBLE PRECISION SBP	! Variable de sommation de L = IS a 
-                                ! OS_NB pour BP.
-      DOUBLE PRECISION SATT	! Variable de sommation de L = IS a 
-                                ! OS_NB pour SATT.
-      DOUBLE PRECISION SARR	! Variable de sommation de L = IS a 
-                                ! OS_NB pour SARR.
-      DOUBLE PRECISION SGR	! Variable de sommation de L = IS a 
-                                ! OS_NB pour SGR.
-      DOUBLE PRECISION SGT	! Variable de sommation de L = IS a 
-                                ! OS_NB pour SGT.
-      DOUBLE PRECISION SART	! Variable de sommation de L = IS a 
-                                ! OS_NB pour SART.
+      DOUBLE PRECISION SBP	! Variable de sommation de L = IS a OS_NB pour BP.
+      DOUBLE PRECISION SATT	! Variable de sommation de L = IS a OS_NB pour SATT.
+      DOUBLE PRECISION SARR	! Variable de sommation de L = IS a OS_NB pour SARR.
+      DOUBLE PRECISION SGR	! Variable de sommation de L = IS a OS_NB pour SGR.
+      DOUBLE PRECISION SGT	! Variable de sommation de L = IS a OS_NB pour SGT.
+      DOUBLE PRECISION SART	! Variable de sommation de L = IS a OS_NB pour SART.
       DOUBLE PRECISION R1		
       DOUBLE PRECISION R2	
 
       DOUBLE PRECISION RAC3	! Racine de 3.
       DOUBLE PRECISION X26	! 2*racine(6)
 
-      INTEGER*4 OS_NB 	! Ordre max des developpements des fonctions de phase 
-			! en Polynomes de Legendre.
-      INTEGER IS	! Ordre de la decomposition en series de Fourier.
+      INTEGER*4 OS_NB 	! Ordre max des dÃ©veloppements des fonctions de phase 
+			       ! en Polynomes de Legendre.
+      INTEGER IS	   ! Ordre de la decomposition en series de Fourier.
 
       INTEGER*4 NBMU    ! Nombre d'angles effectifs des simulations
       INTEGER*4 I
       INTEGER*4 K
-      INTEGER*4 IG		! Variable a 1 ou -1.
+      INTEGER*4 IG	! Variable a 1 ou -1.
       INTEGER*4 L
-      INTEGER*4 LP		! Valeur L+1
-      INTEGER*4 LM		! Valeur L-1
+      INTEGER*4 LP	! Valeur L+1
+      INTEGER*4 LM	! Valeur L-1
       INTEGER*4 J	! Indice du tableau de RMU.
 
 
@@ -1899,7 +2118,7 @@ C------------------------------------------------------
 C* Boucles sur les directions d'incidence (K = mup, 
 C* avec -1 < mup < 1) et d'emergence (J = mu > 0)
 C------------------------------------------------------
-      DO 32 J=-NBMU,NBMU
+      DO 321 J=-NBMU,NBMU
          DO 32 K=-NBMU,NBMU
             SBP=0.
             SATT=0.
@@ -1912,19 +2131,19 @@ C------------------------------------------------------
 
 C* Boucle de sommation sur L = IS a OS_NB.
 C-----------------------------------------------
-           DO 33 L=IS,OS_NB
-              R1=TSL(L,J)*TSL(L,K)
-              R2=RSL(L,J)*RSL(L,K)
-              SBP=SBP+BETA(L)*PSL(L,J)*PSL(L,K)
-              SATT=SATT+ALPHA(L)*R1+ZETA(L)*R2
-              SARR=SARR+ZETA(L)*R1+ALPHA(L)*R2
-              SGR=SGR+GAMMA(L)*PSL(L,J)*RSL(L,K)
-              SGT=SGT+GAMMA(L)*PSL(L,J)*TSL(L,K)
-              SART=SART+ALPHA(L)*RSL(L,K)*TSL(L,J)+
-     &             ZETA(L)*RSL(L,J)*TSL(L,K)
-  33       CONTINUE
+            DO 33 L=IS,OS_NB
+               R1=TSL(L,J)*TSL(L,K)
+               R2=RSL(L,J)*RSL(L,K)
+               SBP=SBP+BETA(L)*PSL(L,J)*PSL(L,K)
+               SATT=SATT+ALPHA(L)*R1+ZETA(L)*R2
+               SARR=SARR+ZETA(L)*R1+ALPHA(L)*R2
+               SGR=SGR+GAMMA(L)*PSL(L,J)*RSL(L,K)
+               SGT=SGT+GAMMA(L)*PSL(L,J)*TSL(L,K)
+               SART=SART+ALPHA(L)*RSL(L,K)*TSL(L,J)+
+     &              ZETA(L)*RSL(L,J)*TSL(L,K)
+  33        CONTINUE !Boucle sur L
   
- 1         CONTINUE
+ 1          CONTINUE
 
             BP(J,K)=SBP
             ATT(J,K)=SATT
@@ -1932,7 +2151,8 @@ C-----------------------------------------------
             GR(J,K)=SGR
             GT(J,K)=SGT
             ART(J,K)=SART
-   32 CONTINUE
+   32    CONTINUE !Boucle sur K
+  321 CONTINUE !Boucle sur J
    
       RETURN
       END  	!FIN DE LA PROCEDURE SOS_NOYAUX
@@ -1948,7 +2168,7 @@ C-----------------------------------------------
 C*===========================================================================
 C PROCEDURE: SOS_INTEGR_EPOPT
 C ==========
-C      Cette procedure realise l'integration sur l'epaisseur optique
+C      Cette procedure realise l'integration sur l'Ã©paisseur optique
 C      du champ de rayonnement :
 C        - champ montant    : Integration du sol au TOA.
 C        - champ descendant : Integration du TOA au sol.
@@ -1956,9 +2176,9 @@ C
 C      L'integration est faite de proche en proche du niveau de depart
 C      au niveau final.
 C      Ceci implique dans la resolution de l'Equation de Transfert Radiatif
-C      de faire des integrations sur l'epaisseur optique entre deux niveaux
+C      de faire des integrations sur l'Ã©paisseur optique entre deux niveaux
 C      consecutifs. Ces integrations font intervenir les fonctions sources
-C      de diffusion (pour I, Q et U - en fonction du niveau d'epaisseur
+C      de diffusion (pour I, Q et U - en fonction du niveau d'Ã©paisseur
 C      optique et de la direction de propagation) pour les ordres en cours
 C      de diffusion et de decomposition en series de Fourier.
 C      L'integration entre deux niveaux est faite par linearisation de la
@@ -1968,25 +2188,25 @@ C       Les couches atmospheriques sont supposees homogenes.
 C
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C
 C     NBMU (I4)    (E)  Nombre d'angles (positifs) effectivement utiles
-C     RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double) (E) Tableau des mu de Gauss.
-C     H(0:SOS_OS_NT) (double) (E)  Epaisseur optique a chaque niveau.
+C     RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double) (E) Tableau des mu de Gauss.
+C     H(0:CTE_OS_NT) (double) (E)  Epaisseur optique a chaque niveau.
 C
-C     I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (E) 
+C     I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (E) 
 C                                                  Fonction source pour I
-C     Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (E) 
+C     Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (E) 
 C                                                  Fonction source pour Q
-C     U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (E) 
+C     U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (E) 
 C                                                  Fonction source pour U
 C                          Vecteur fonction source en fonction du niveau du 
 C                          profil et de la direction.
 C    	
-C     I1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (S) Champ I.
-C     Q1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (S) Champ Q.
-C     U1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (S) Champ U.
+C     I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (S) Champ I.
+C     Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (S) Champ Q.
+C     U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (S) Champ U.
 C                          Champ de luminance  en fonction du niveau
 C                          du profil et de la direction. 
 C
@@ -1999,7 +2219,7 @@ C ------------
 C     Aucun
 C
 C==============================================================================
-      SUBROUTINE SOS_INTEGR_EPOPT(NBMU,RMU,H,I2,Q2,U2,I1,Q1,U1)
+      SUBROUTINE SOS_INTEGR_EPOPT(NBMU,RMU,NT,H,I2,Q2,U2,I1,Q1,U1)
       
       IMPLICIT NONE
       
@@ -2008,24 +2228,24 @@ C* Definition des variables
 C*------------------------------------------------------------------
 
 C* Directions de propagation :
-      DOUBLE PRECISION RMU(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION RMU(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       				!  Tableau des mu de Gauss.
 
-C* Profil d'epaisseur optique :
-      DOUBLE PRECISION H(0:SOS_OS_NT)	!  Epaisseur optique pour chaque niveau.
+C* Profil d'Ã©paisseur optique :
+      DOUBLE PRECISION H(0:CTE_OS_NT)	!  Epaisseur optique pour chaque niveau.
      	
 C* Vecteur fonction source en fonction du niveau du profil et de la direction.
-      DOUBLE PRECISION I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+      DOUBLE PRECISION I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
       					!  Fonction source pour I.
-      DOUBLE PRECISION Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+      DOUBLE PRECISION Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
       					!  Fonction source pour Q.
-      DOUBLE PRECISION U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       					!  Fonction source pour U.
 
 C* Champ de luminance en fonction du niveau du profil et de la direction.       	
-      DOUBLE PRECISION I1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	!  Champ I.
-      DOUBLE PRECISION Q1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	!  Champ Q.
-      DOUBLE PRECISION U1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	!  Champ U.
+      DOUBLE PRECISION I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	!  Champ I.
+      DOUBLE PRECISION Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	!  Champ Q.
+      DOUBLE PRECISION U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	!  Champ U.
 
       DOUBLE PRECISION RMUK 	! Valeur K du tableau des mu de Gauss 
 
@@ -2038,15 +2258,17 @@ C* Champ de luminance en fonction du niveau du profil et de la direction.
 
       DOUBLE PRECISION ATT	! Attenuation entre deux niveaux consecutifs.
 
-      DOUBLE PRECISION MATT	! 1 - att.
+      DOUBLE PRECISION MATT	       ! 1 - att.
 
       DOUBLE PRECISION ATTDTAU	! att * dtau
 
       DOUBLE PRECISION A,B	! Coefficients d'interpolation lineaire
 
+      INTEGER*4 NT		! Nombre de couches du profil atmo
+      
       INTEGER*4 I,JJ		! Indices de niveau.
       INTEGER*4 K		! Indice de direction.
-      INTEGER*4 NBMU            ! Nombre d'angles effectifs des simulations
+      INTEGER*4 NBMU        ! Nombre d'angles effectifs des simulations
 		
 C------------------------------------------------------	
 C* Integration du champ de luminance montant (mu > 0) du sol au TOA.
@@ -2054,16 +2276,16 @@ C*
 C* Integration de proche en proche du sol au TOA par linearisation
 C* de la fonction source entre deux niveaux successifs.
 C------------------------------------------------------
-      DO 108 K=1,NBMU
+      DO 107 K=1,NBMU
 
          RMUK=RMU(K)
 
 C* Initialisation par la valeur au sol.
-         ZI1=I1(SOS_OS_NT,K)
-         ZQ1=Q1(SOS_OS_NT,K)
-         ZU1=U1(SOS_OS_NT,K)
+         ZI1=I1(NT,K)
+         ZQ1=Q1(NT,K)
+         ZU1=U1(NT,K)
 		
-         DO 108 I=SOS_OS_NT-1,0,-1
+         DO 108 I=NT-1,0,-1
             JJ=I+1
             DTAU = H(JJ)-H(I)
             ATT = DEXP(-DTAU/RMUK)
@@ -2084,7 +2306,8 @@ C* Initialisation par la valeur au sol.
             A = (U2(JJ,K) - B) / DTAU
             ZU1 = ZU1*ATT + MATT*(A*RMUK+B) - A*ATTDTAU
             U1(I,K)=ZU1
-108   CONTINUE        !Boucles sur I et K
+108      CONTINUE     !Boucles sur I
+107   CONTINUE        !Boucles sur K
 
 
 C------------------------------------------------------
@@ -2106,7 +2329,7 @@ C* Initialisation par la valeur au TOA.
          ZQ1=0.D+00
          ZU1=0.D+00
 
-         DO 109 I=1,SOS_OS_NT
+         DO 110 I=1,NT
             JJ=I-1
             DTAU = H(I)-H(JJ)
             ATT = DEXP(DTAU/RMUK)
@@ -2127,7 +2350,8 @@ C* Initialisation par la valeur au TOA.
             A = (B- U2(JJ,K)) / DTAU
             ZU1 = ZU1*ATT + MATT*(A*RMUK+B) + A*ATTDTAU
             U1(I,K)=ZU1
-  109 CONTINUE  !Boucles sur I et K
+  110    CONTINUE  !Boucles sur I
+  109 CONTINUE  !Boucles sur K
 
       RETURN
       END  	!FIN DE LA PROCEDURE SOS_INTEGR_EPOPT
@@ -2141,55 +2365,55 @@ C*============================================================================
 C PROCEDURE: SOS_FSOURCE_ORDRE1
 C ==========
 C      Cette procedure calcule le vecteur fonction source de la diffusion 
-C      primaire, a partir du champ de rayonnement solaire incident et des
+C      primaire, Ã  partir du champ de rayonnement solaire incident et des
 C      proprietes de diffusion de l'atmosphere (fonction de phase).
 C      
 C      Calcul pour chaque niveau du profil et pour chaque direction de 
 C      propagation.
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C
-C       IS   (I4)    (E)  Ordre en cours du developpement en series de Fourier.
+C       IS   (I4)    (E)  Ordre en cours du dÃ©veloppement en series de Fourier.
 C       NBMU (I4)    (E)  Nombre d'angles (positifs) effectivement utiles
 C       JK   (I4)    (E)  Numero de stockage de mus dans le tableau RMU
 C                        (0 par defaut).
-C       XDEL(0:SOS_OS_NT)  (double)  (E)  Pourcentage d'aerosols par niveau.
-C       YDEL(0:SOS_OS_NT)  (double)  (E)  Pourcentage de molecules par niveau.
+C       XDEL(0:CTE_OS_NT)  (double)  (E)  Pourcentage d'aerosols par niveau.
+C       YDEL(0:CTE_OS_NT)  (double)  (E)  Pourcentage de molecules par niveau.
 C
 C       BETA0	  (double)  (E) 
-C       BETA2     (double)  (E) 	.
-C       GAMMA2	  (double)  (E) 	
-C                   Coefficients du developpement de la matrice de phase
+C       BETA2   (double)  (E) 	.
+C       GAMMA2  (double)  (E) 	
+C                   Coefficients du dÃ©veloppement de la matrice de phase
 C                   moleculaire en fonctions de Legendre
 C
-C       XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 	
-C      		     Fonction de Legendre PSL � l'ordre L=2 et S=IS
+C       XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 	
+C      		     Fonction de Legendre PSL Ã  l'ordre L=2 et S=IS
 C      		     en fonction de l'angle mu.     		
-C       XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 	
-C     		     Fonction RSL a l'ordre L=2 et S=IS en fonction de mu.
-C       XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 	
-C     		     Fonction TSL a l'ordre L=2 et S=IS en fonction de mu.
+C       XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 	
+C     		     Fonction RSL Ã  l'ordre L=2 et S=IS en fonction de mu.
+C       XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 	
+C     		     Fonction TSL Ã  l'ordre L=2 et S=IS en fonction de mu.
 C	
-C       BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element P11.
-C       GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element P12 ou P21.
-C       GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element -P13 ou -P31.
-C               Element Pij de la matrice de phase des aerosols pour un ordre
+C       BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment P11.
+C       GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment P12 ou P21.
+C       GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment -P13 ou -P31.
+C               ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 C               IS de la decomposition en series de Fourier.
 C               Soit mup la direction d'incidence (-1 < mup < 1)
 C               et mu celle de diffusion (-1 < mu < 1),
 C               la diffusion est exprimee par Pij(mu,mup).
 C
-C       CH(0:SOS_OS_NT)  (double)  (E) 	Attenuation du faisceau solaire 
+C       CH(0:CTE_OS_NT)  (double)  (E) 	Attenuation du faisceau solaire 
 C                                       direct/4.
 C
-C       I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S)	
-C       Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S)	
-C       U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S)	
+C       I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S)	
+C       Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S)	
+C       U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S)	
 C	         Vecteur fonction source I,Q,U en fonction du niveau du profil
 C	         et de la direction.
 C 
@@ -2204,7 +2428,7 @@ C ------------
 C     Aucun
 C
 C==============================================================================
-      SUBROUTINE SOS_FSOURCE_ORDRE1(IS,NBMU,JK,XDEL,YDEL,
+      SUBROUTINE SOS_FSOURCE_ORDRE1(IS,NBMU,NT,JK,XDEL,YDEL,
      &                              BETA0,BETA2,GAMMA2,
      &                              XPL,XRL,XTL,BP,GR,GT,CH,I2,Q2,U2)
       
@@ -2214,66 +2438,67 @@ C==============================================================================
 C* Definition des variables     
 C*------------------------------------------------------------------
 
-      DOUBLE PRECISION XDEL(0:SOS_OS_NT)   !Pourcentage d'aerosols par niveau.
-      DOUBLE PRECISION YDEL(0:SOS_OS_NT)   !Pourcentage de molecules par niveau.
+      DOUBLE PRECISION XDEL(0:CTE_OS_NT)   !Pourcentage d'aerosols par niveau.
+      DOUBLE PRECISION YDEL(0:CTE_OS_NT)   !Pourcentage de molecules par niveau.
 
-      DOUBLE PRECISION BETA0	! Coefficients du developpement de la matrice 
+      DOUBLE PRECISION BETA0	! Coefficients du dÃ©veloppement de la matrice 
       DOUBLE PRECISION BETA2	! de phase moleculaire en fonctions de Legendre.
       DOUBLE PRECISION GAMMA2
 
-      DOUBLE PRECISION XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       			      ! Fonction de Legendre PSL a l'ordre L=2 et S=IS
       			      ! en fonction de l'angle mu.
       		
-      DOUBLE PRECISION XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+      DOUBLE PRECISION XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
       			! Fonction RSL a l'ordre L=2 et S=IS en fonction de mu
-      DOUBLE PRECISION XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+      DOUBLE PRECISION XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
       			! Fonction TSL a l'ordre L=2 et S=IS en fonction de mu
 
-	! Element Pij de la matrice de phase des aerosols pour un ordre
+	! ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 	! IS de la decomposition en series de Fourier.
 	! Soit mup la direction d'incidence (-1 < mup < 1)
 	! et mu celle de diffusion (-1 < mu < 1),
 	! la diffusion est exprimee par Pij(mu,mup).	
       DOUBLE PRECISION 
-     &    BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! Element P11.
+     &    BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! ElÃ©ment P11.
       DOUBLE PRECISION 
-     &    GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! P12 ou P21.
+     &    GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! P12 ou P21.
       DOUBLE PRECISION 
-     &    GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! -P13 ou -P31.
+     &    GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! -P13 ou -P31.
     
 
-      DOUBLE PRECISION CH(0:SOS_OS_NT)	! Attenuation du faisceau solaire 
+      DOUBLE PRECISION CH(0:CTE_OS_NT)  ! Attenuation du faisceau solaire 
                                         ! direct / 4.
 
 	! Vecteur fonction source en fonction du niveau du profil
 	! et de la direction.
-      DOUBLE PRECISION I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour I.
-      DOUBLE PRECISION Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour Q.
-      DOUBLE PRECISION U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour U.
 
       DOUBLE PRECISION SPL   ! Valeur de la fonction de XPL pour mu = mus.
-      DOUBLE PRECISION SA1   ! Element P11 de la matrice de phase moleculaire.
-      DOUBLE PRECISION SB1   ! Element P21 de la matrice de phase moleculaire.
-      DOUBLE PRECISION SC1   ! Element P31 de la matrice de phase moleculaire.
-      DOUBLE PRECISION SA2   ! Element P11 de la matrice de phase des aerosols.
-      DOUBLE PRECISION SB2   ! Element P21 de la matrice de phase des aerosols.
-      DOUBLE PRECISION SC2   ! Element P31 de la matrice de phase des aerosols.
+      DOUBLE PRECISION SA1   ! ElÃ©ment P11 de la matrice de phase moleculaire.
+      DOUBLE PRECISION SB1   ! ElÃ©ment P21 de la matrice de phase moleculaire.
+      DOUBLE PRECISION SC1   ! ElÃ©ment P31 de la matrice de phase moleculaire.
+      DOUBLE PRECISION SA2   ! ElÃ©ment P11 de la matrice de phase des aerosols.
+      DOUBLE PRECISION SB2   ! ElÃ©ment P21 de la matrice de phase des aerosols.
+      DOUBLE PRECISION SC2   ! ElÃ©ment P31 de la matrice de phase des aerosols.
  
       DOUBLE PRECISION PCRAY	! Valeur du pourcentage de molecules.
       DOUBLE PRECISION PCAER	! Valeur du pourcentage d'aerosols.
 
       DOUBLE PRECISION ATTDIR	! Valeur ponctuelle du tableau CH.
 
+      INTEGER*4 NT      ! Nombre de couches du profil atmo
           
-      INTEGER*4 IS	! Ordre en cours du developpement en series de Fourier.
-      INTEGER*4 NBMU    ! Nombre d'angles effectifs des simulations
+      INTEGER*4 IS	! Ordre en cours du dÃ©veloppement en series de Fourier.
+      INTEGER*4 NBMU ! Nombre d'angles effectifs des simulations
       
       INTEGER JK	! Numero de stockage de mus dans le tableau RMU
       			! (0 par defaut).
@@ -2283,7 +2508,7 @@ C*------------------------------------------------------------------
 
 C-------------------------------------------------------------      
 C* Calcul des elements P11 = SAi , P21 = SBi  et P31 = SCi
-C* de la matrice de phase, selon l'ordre IS du developpement 
+C* de la matrice de phase, selon l'ordre IS du dÃ©veloppement 
 C* en series de Fourier (i = 1 : molecules, i = 2 : aerosols).
 C* La direction d'incidence est la direction d'eclairement 
 C* solaire (mus <=> JK = 0).
@@ -2294,7 +2519,7 @@ C* Boucle sur les directions de diffusion.
 C------------------------------------------
       DO 100 J=-NBMU,NBMU
 
-        IF (IS-2) 200,200,201
+        IF ((IS-2).GT.0) GOTO 201
       
 C* Calculs pour IS <= 2.
 C-----------------------
@@ -2325,7 +2550,7 @@ C------------------------------------------------------------------------
 C* Calculs de la fonction source de diffusion primaire pour chaque niveau
 C* du profil et chaque direction.
 C------------------------------------------------------------------------
-        DO 101 K=0,SOS_OS_NT
+        DO 101 K=0,NT
            ATTDIR=CH(K)
            PCRAY=YDEL(K)
            PCAER=XDEL(K)
@@ -2349,17 +2574,17 @@ C*============================================================================
 C PROCEDURE: SOS_FSOURCE_ORDREIG
 C ==========
 C      Cette procedure calcule le vecteur fonction source de la diffusion
-C      d'ordre IG>1, a partir du champ de rayonnement d'ordre IG-1 et des
+C      d'ordre IG>1, Ã  partir du champ de rayonnement d'ordre IG-1 et des
 C      proprietes de diffusion de l'atmosphere (fonction de phase).
 C
 C      Elle realise le calcul des elements de la matrice de phase, 
-C      selon l'ordre IS du developpement en series de Fourier.
+C      selon l'ordre IS du dÃ©veloppement en series de Fourier.
 C      On construit indirectement la matrice suivante P(mu,mup) :
 C         BP(mu,mup)    GR(mu,mup)    -GT(mu,mup)
 C         GR(mup,mu)    ARR(mu,mup)   -ART(mup,mu)
 C        -GT(mup,mu)   -ART(mu,mup)    ATT(mu,mup)
 C 
-C      Les termes reellement calcules sont equivalents en suivant les regles
+C      Les termes rÃ©ellement calcules sont equivalents en suivant les regles
 C      de permutation des indices. 
 C	
 C      Une integration spatiale est appliquee sur les directions d'incidence.
@@ -2369,59 +2594,59 @@ C      propagation.
 C
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C   
-C       IS   (I4)    (E)  Ordre en cours du developpement en series de Fourier.
+C       IS   (I4)    (E)  Ordre en cours du dÃ©veloppement en series de Fourier.
 C       NBMU (I4)    (E)  Nombre d'angles (positifs) effectivement utiles
-C       XDEL(0:SOS_OS_NT)  (double)  (E)  Pourcentage d'aerosols par niveau.
-C       YDEL(0:SOS_OS_NT)  (double)  (E)  Pourcentage de molecules par niveau.
+C       XDEL(0:CTE_OS_NT)  (double)  (E)  Pourcentage d'aerosols par niveau.
+C       YDEL(0:CTE_OS_NT)  (double)  (E)  Pourcentage de molecules par niveau.
 C
 C       BETA0	  (double)  (E) 
-C       BETA2     (double)  (E) 	.
-C       GAMMA2	  (double)  (E) 
-C       ALPHA2    (double)  (E) 	
-C                   Coefficients du developpement de la matrice de phase
+C       BETA2   (double)  (E) 	.
+C       GAMMA2  (double)  (E) 
+C       ALPHA2  (double)  (E) 	
+C                   Coefficients du dÃ©veloppement de la matrice de phase
 C                   moleculaire en fonctions de Legendre
 C
-C       XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 	
-C      		     Fonction de Legendre PSL � l'ordre L=2 et S=IS
+C       XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 	
+C      		     Fonction de Legendre PSL Ã  l'ordre L=2 et S=IS
 C      		     en fonction de l'angle mu.     		
-C       XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 	
-C     		     Fonction RSL a l'ordre L=2 et S=IS en fonction de mu.
-C       XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 	
-C     		     Fonction TSL a l'ordre L=2 et S=IS en fonction de mu.
+C       XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 	
+C     		     Fonction RSL Ã  l'ordre L=2 et S=IS en fonction de mu.
+C       XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 	
+C     		     Fonction TSL Ã  l'ordre L=2 et S=IS en fonction de mu.
 C
 C      	
-C       I1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)    Champ I.
-C       Q1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)    Champ Q.
-C       U1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)    Champ U.
+C       I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)    Champ I.
+C       Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)    Champ Q.
+C       U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)    Champ U.
 C         	     Champ de luminance d'ordre  IG en fonction du 
-C                    niveau du profil et de la direction. 
+C                  niveau du profil et de la direction. 
 C	
-C       BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element P11.
-C       GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element P12 ou P21.
-C       GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C                                                        Element -P13 ou -P31.
-C       ARR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E) 
-C                                                        Element P22.
-C       ART(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E) 
-C                                                        Element -P23 ou -P32.
-C       ATT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E)
-C                                                        Element P33.
-C               Element Pij de la matrice de phase des aerosols pour un ordre
+C       BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment P11.
+C       GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment P12 ou P21.
+C       GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C                                                        ElÃ©ment -P13 ou -P31.
+C       ARR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E) 
+C                                                        ElÃ©ment P22.
+C       ART(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E) 
+C                                                        ElÃ©ment -P23 ou -P32.
+C       ATT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E)
+C                                                        ElÃ©ment P33.
+C               ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 C               IS de la decomposition en series de Fourier.
 C               Soit mup la direction d'incidence ( -1 < mup < 1)
 C               et mu celle de diffusion ( -1 < mu < 1),
 C               la diffusion est exprimee par Pij(mu,mup).
 C
-C       GA(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) Tableau des poids de Gauss.
+C       GA(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) Tableau des poids de Gauss.
 C
-C       I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S)	
-C       Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S)	
-C       U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (S)	
+C       I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S)	
+C       Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S)	
+C       U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (S)	
 C	         Vecteur fonction source I,Q,U en fonction du niveau du profil
 C	         et de la direction.
 C
@@ -2435,7 +2660,7 @@ C ------------
 C     Aucun
 C
 C==============================================================================
-      SUBROUTINE SOS_FSOURCE_ORDREIG(IS,NBMU,XDEL,YDEL,
+      SUBROUTINE SOS_FSOURCE_ORDREIG(IS,NBMU,NT,XDEL,YDEL,
      &                               BETA0,BETA2,GAMMA2,ALPHA2,
      &                               XPL,XRL,XTL,I1,Q1,U1,
      &                               BP,GR,GT,ARR,ART,ATT,GA,
@@ -2447,65 +2672,65 @@ C==============================================================================
 C* Definition des variables     
 C*------------------------------------------------------------------
 
-      DOUBLE PRECISION XDEL(0:SOS_OS_NT)  ! Pourcentage d'aerosols par niveau.
-      DOUBLE PRECISION YDEL(0:SOS_OS_NT)  ! Pourcentage de molecules par niveau.
+      DOUBLE PRECISION XDEL(0:CTE_OS_NT)  ! Pourcentage d'aerosols par niveau.
+      DOUBLE PRECISION YDEL(0:CTE_OS_NT)  ! Pourcentage de molecules par niveau.
 
-      DOUBLE PRECISION BETA0	! Coefficients du developpement de la matrice 
+      DOUBLE PRECISION BETA0	! Coefficients du dÃ©veloppement de la matrice 
       DOUBLE PRECISION BETA2	! de phase moleculaire en fonctions de Legendre.
       DOUBLE PRECISION GAMMA2	
       DOUBLE PRECISION ALPHA2	
 
-      DOUBLE PRECISION XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			      ! Fonction de Legendre PSL � l'ordre L=2 et S=IS
+      DOUBLE PRECISION XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			      ! Fonction de Legendre PSL Ã  l'ordre L=2 et S=IS
       			      ! en fonction de l'angle mu.     		
-      DOUBLE PRECISION XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction RSL a l'ordre L=2 et S=IS en fonction de mu.
-      DOUBLE PRECISION XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction TSL a l'ordre L=2 et S=IS en fonction de mu.
+      DOUBLE PRECISION XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction RSL Ã  l'ordre L=2 et S=IS en fonction de mu.
+      DOUBLE PRECISION XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction TSL Ã  l'ordre L=2 et S=IS en fonction de mu.
 
 
       	! Champ de luminance d'ordre IG-1 en fonction du niveau du profil
 	! et de la direction.       	
-      DOUBLE PRECISION I1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ I.
-      DOUBLE PRECISION Q1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ Q.
-      DOUBLE PRECISION U1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ U.
+      DOUBLE PRECISION I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ I.
+      DOUBLE PRECISION Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ Q.
+      DOUBLE PRECISION U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ U.
 
 	! Vecteur fonction source en fonction du niveau du profil
 	! et de la direction.
-      DOUBLE PRECISION I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour I.
-      DOUBLE PRECISION Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour Q.
-      DOUBLE PRECISION U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour U.
 
 
-	! Element Pij de la matrice de phase des aerosols pour un ordre
+	! ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 	! IS de la decomposition en series de Fourier.
 	! Soit mup la direction d'incidence (-1 < mup < 1)
 	! et mu celle de diffusion (-1 < mu < 1),
 	! la diffusion est exprimee par Pij(mu,mup).	
       DOUBLE PRECISION 
-     &    BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! Element P11.
+     &    BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! ElÃ©ment P11.
       DOUBLE PRECISION 
-     &    GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! P12 ou P21.
+     &    GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! P12 ou P21.
       DOUBLE PRECISION 
-     &    GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! -P13 ou -P31.
+     &    GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! -P13 ou -P31.
       DOUBLE PRECISION 
-     &    ARR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! P22.
+     &    ARR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! P22.
       DOUBLE PRECISION 
-     &    ART(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! -P23 ou -P32.
+     &    ART(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! -P23 ou -P32.
       DOUBLE PRECISION 
-     &    ATT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! P33.
+     &    ATT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! P33.
 
 
-      DOUBLE PRECISION GA(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! Tableau des poids de Gauss
+      DOUBLE PRECISION GA(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! Tableau des poids de Gauss
 
       DOUBLE PRECISION XPK	! Valeur de XPL pour les directions de
       				! diffusion mu > 0 (indice K).	
@@ -2548,7 +2773,7 @@ C*------------------------------------------------------------------
       DOUBLE PRECISION PCRAY	! Valeur du pourcentage de molecules.
       DOUBLE PRECISION PCAER	! Valeur du pourcentage d'aerosols.
  
-      DOUBLE PRECISION BPJK	! Valeur des elements de la matrice de 
+      DOUBLE PRECISION BPJK	    ! Valeur des elements de la matrice de 
       DOUBLE PRECISION BPJMK    ! phase du melange molecules + aerosols.
       DOUBLE PRECISION GTJMK
       DOUBLE PRECISION GTJK
@@ -2567,7 +2792,8 @@ C*------------------------------------------------------------------
       DOUBLE PRECISION ATTJK
       DOUBLE PRECISION ATTJMK
 
-      INTEGER*4 IS	! Ordre en cours du developpement en series de Fourier.
+      INTEGER*4 NT	! Nombde de couches du profil atmo
+      INTEGER*4 IS	! Ordre en cours du dÃ©veloppement en series de Fourier.
       INTEGER*4 NBMU    ! Nombre d'angles effectifs des simulations
 
       INTEGER*4 I
@@ -2577,11 +2803,12 @@ C*------------------------------------------------------------------
 
 
 C------------------------------------------------------
-C* Calcul des elements de la matrice de phase, selon 
-C* l'ordre IS du developpement en series de Fourier.
+C* Calcul des éléments de la matrice de phase, selon 
+C* l'ordre IS du développement en series de Fourier.
 C------------------------------------------------------
 
-      IF (IS-2) 210,210,211
+      IF ((IS-2).GT.0) GOTO 211
+	
       
 C--------------------------------
 C* Calculs pour IS <= 2.
@@ -2591,7 +2818,7 @@ C* Boucle sur les directions de diffusion mu (mu > 0).
 C------------------------------------------------------
  210  DO 455 K=1,NBMU
 
-C* Valeur des fonctions PSL, RSL et TSL � l'ordre L=2 et S=IS
+C* Valeur des fonctions PSL, RSL et TSL Ã  l'ordre L=2 et S=IS
 C* en fonction de l'angle mup et -mup
 C* (pour le calcul de la matrice de phase moleculaire 
 C*  par le programme appelant).
@@ -2605,7 +2832,7 @@ C------------------------------------------------------
 
 C* Boucle sur le profil.
 C-----------------------
-         DO 455 I=0,SOS_OS_NT
+         DO 466 I=0,NT
             II1=0.
             II2=0.
             QQ1=0.
@@ -2686,7 +2913,11 @@ C--------------------------
             Q2(I,-K)=QQ1 * 0.5
             U2(I,K)=UU2 * 0.5
             U2(I,-K)=UU1 * 0.5
- 455  CONTINUE   ! Boucle sur I et K
+	    
+	    
+ 466     CONTINUE   ! Boucle sur I
+	    
+ 455  CONTINUE   ! Boucle sur K
  
       GOTO 212
       
@@ -2701,7 +2932,7 @@ C------------------------------------------------------
 
 C* Boucle sur le profil.
 C------------------------
-         DO 45 I=0,SOS_OS_NT
+         DO 46 I=0,NT
             II1=0.
             II2=0.
             QQ1=0.
@@ -2776,8 +3007,9 @@ C--------------------------
             Q2(I,-K)=QQ1 * 0.5
             U2(I,K)=UU2  * 0.5
             U2(I,-K)=UU1 * 0.5
-	    
-   45 CONTINUE    ! Boucle sur I et K
+
+   46    CONTINUE ! Boucle sur I     
+   45 CONTINUE    ! Boucle sur K
 
   212 CONTINUE
 
@@ -2799,46 +3031,46 @@ C      sur mer plate, selon les lois de Fresnel (diffusion du champ
 C      de reflexion d'ordre 1).
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C
-C      F11sun  (double)  (E)     Element F11 de la matrice de reflexion de 
+C      F11sun  (double)  (E) ElÃ©ment F11 de la matrice de reflexion de 
 C				 Fresnel pour l'incidence solaire.    
-C      F12sun  (double)  (E)     Idem pour l'element F12.   
+C      F12sun  (double)  (E) Idem pour l'element F12.   
 C
-C      XDEL(0:SOS_OS_NT)  (double)  (E) Pourcentage d'aerosols par niveau.
-C      YDEL(0:SOS_OS_NT)  (double)  (E) Pourcentage de molecules par niveau. 
+C      XDEL(0:CTE_OS_NT)  (double)  (E) Pourcentage d'aerosols par niveau.
+C      YDEL(0:CTE_OS_NT)  (double)  (E) Pourcentage de molecules par niveau. 
 C
 C      BETA0   (double)  (E)  
 C      BETA2   (double)  (E) 
 C      GAMMA2  (double)  (E)	
 C      ALPHA2  (double)  (E)
-C             Coefficients du developpement de la matrice 
+C             Coefficients du dÃ©veloppement de la matrice 
 C             de phase moleculaire en fonctions de Legendre.
 C
-C      BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element P11.
-C      GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element P12 ou P21.
-C      GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                                                        Element -P13 ou -P31.
-C      ARR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E) 
-C                                                        Element P22.
-C      ART(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E)
-C                                                        Element -P23 ou -P32.
-C             Element Pij de la matrice de phase des aerosols pour un ordre
+C      BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment P11.
+C      GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment P12 ou P21.
+C      GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                                                        ElÃ©ment -P13 ou -P31.
+C      ARR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E) 
+C                                                        ElÃ©ment P22.
+C      ART(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E)
+C                                                        ElÃ©ment -P23 ou -P32.
+C             ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 C             IS de la decomposition en series de Fourier.
 C             Soit mup la direction d'incidence ( -1 < mup < 1)
 C             et mu celle de diffusion ( -1 < mu < 1),
 C             la diffusion est exprimee par Pij(mu,mup).	
 C
-C      XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E) 
-C      		        Fonction de Legendre PSL � l'ordre L=2
+C      XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E) 
+C      		        Fonction de Legendre PSL Ã  l'ordre L=2
 C   		        et S=IS en fonction de l'angle mu.
-C      XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E)
-C      		        Fonction RSL a l'ordre L=2 et S=IS.
-C      XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) (double)  (E)
-C      		        Fonction TSL a l'ordre L=2 et S=IS
+C      XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E)
+C      		        Fonction RSL Ã  l'ordre L=2 et S=IS.
+C      XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) (double)  (E)
+C      		        Fonction TSL Ã  l'ordre L=2 et S=IS
 C	      Fonctions de Legendre et fonctions derivees pour le calcul
 C	      de la matrice de phase.
 C
@@ -2848,13 +3080,13 @@ C      NBMU (I4)    (E)  Nombre d'angles (positifs) effectivement utiles
 C
 C      MUS (double)  (E)   Cosinus de l'angle zenithal solaire.
 C
-C      H(0:SOS_OS_NT) (double) (E)  Epaisseur optique a chaque niveau.
+C      H(0:CTE_OS_NT) (double) (E)  Epaisseur optique a chaque niveau.
 C
-C      I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (S) 
+C      I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (S) 
 C                                                  Fonction source pour I
-C      Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (S) 
+C      Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (S) 
 C                                                  Fonction source pour Q
-C      U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double) (S) 
+C      U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double) (S) 
 C                                                  Fonction source pour U
 C             Vecteur fonction source, en fonction du niveau du 
 C             profil et de la direction, pour la diffusion de
@@ -2871,11 +3103,11 @@ C ------------
 C     Aucun
 C
 C==============================================================================
-      SUBROUTINE SOS_FSOURCE_DIFF_FRESNEL1(F11sun,F12sun,XDEL,YDEL,
+      SUBROUTINE SOS_FSOURCE_DIFF_FRESNEL1(F11sun,F12sun,XDEL,YDEL,NT,
      &                                     BETA0,BETA2,GAMMA2,ALPHA2,
      &                                     BP,GR,GT,ARR,ART,
      &                                     XPL,XRL,XTL,IS,NBMU,
-     &					   MUS,H,I2,Q2,U2)
+     &					        MUS,H,I2,Q2,U2)
      
       IMPLICIT NONE
 
@@ -2884,23 +3116,23 @@ C* Definition des variables
 C*-----------------------------------------------------------------------     
 	! Vecteur fonction source en fonction du niveau du profil
 	! et de la direction.
-      DOUBLE PRECISION I2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION I2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour I.
-      DOUBLE PRECISION Q2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour Q.
-      DOUBLE PRECISION U2(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION U2(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
       						! Fonction source pour U.
 						
-      DOUBLE PRECISION F11sun   ! Element de la matrice de Fresnel
-      			        ! avec pour incidence la direction
-			        ! d'eclairement solaire.
-      DOUBLE PRECISION F12sun   ! Element de la matrice de Fresnel.
+      DOUBLE PRECISION F11sun   ! ElÃ©ment de la matrice de Fresnel
+      			           ! avec pour incidence la direction
+			           ! d'eclairement solaire.
+      DOUBLE PRECISION F12sun   ! ElÃ©ment de la matrice de Fresnel.
 
-      DOUBLE PRECISION XDEL(0:SOS_OS_NT)  !Pourcentage d'aerosols par niveau.
-      DOUBLE PRECISION YDEL(0:SOS_OS_NT)  !Pourcentage de molecules par niveau.
+      DOUBLE PRECISION XDEL(0:CTE_OS_NT)  !Pourcentage d'aerosols par niveau.
+      DOUBLE PRECISION YDEL(0:CTE_OS_NT)  !Pourcentage de molecules par niveau.
 
       DOUBLE PRECISION MUS               ! Cosinu de l'angle zenithal solaire.
-      DOUBLE PRECISION H(0:SOS_OS_NT)	 !Epaisseur optique pour chaque niveau.
+      DOUBLE PRECISION H(0:CTE_OS_NT)    ! Epaisseur optique pour chaque niveau.
            
       DOUBLE PRECISION YR   ! Pourcentage de molecules au niveau K du profil.
       DOUBLE PRECISION YYR  ! Pourcentage de molecules au niveau K+1 du profil.
@@ -2908,41 +3140,41 @@ C*-----------------------------------------------------------------------
       DOUBLE PRECISION XXP  ! Pourcentage d'aerosols au niveau K+1 du profil.      
 
 
-      DOUBLE PRECISION XPL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction de Legendre PSL � l'ordre L=2 et S=IS
+      DOUBLE PRECISION XPL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction de Legendre PSL Ã  l'ordre L=2 et S=IS
       			! en fonction de l'angle mu.     		
-      DOUBLE PRECISION XRL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction RSL a l'ordre L=2 et S=IS en fonction de mu.
-      DOUBLE PRECISION XTL(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      			! Fonction TSL a l'ordre L=2 et S=IS en fonction de mu.
+      DOUBLE PRECISION XRL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction RSL Ã  l'ordre L=2 et S=IS en fonction de mu.
+      DOUBLE PRECISION XTL(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      			! Fonction TSL Ã  l'ordre L=2 et S=IS en fonction de mu.
 
       DOUBLE PRECISION SPL   ! Valeur de la fonction de XPL pour mu = mus
            	
-      DOUBLE PRECISION BETA0	! Coefficients du developpement de la matrice 
-      DOUBLE PRECISION BETA2	! de phase moleculaire en fonctions de Legendre
+      DOUBLE PRECISION BETA0 ! Coefficients du dÃ©veloppement de la matrice 
+      DOUBLE PRECISION BETA2 ! de phase moleculaire en fonctions de Legendre
       DOUBLE PRECISION GAMMA2	
       DOUBLE PRECISION ALPHA2	
 
-	! Element Pij de la matrice de phase des aerosols pour un ordre
+	! ElÃ©ment Pij de la matrice de phase des aerosols pour un ordre
 	! IS de la decomposition en series de Fourier.
 	! Soit mup la direction d'incidence (-1 < mup < 1)
 	! et mu celle de diffusion (-1 < mu < 1),
 	! la diffusion est exprimee par Pij(mu,mup).	
       DOUBLE PRECISION 
-     &    BP(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! Element P11.
+     &    BP(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! ElÃ©ment P11.
       DOUBLE PRECISION 
-     &    GR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! P12 ou P21.
+     &    GR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! P12 ou P21.
       DOUBLE PRECISION 
-     &    GT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &       -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  ! -P13 ou -P31.
+     &    GT(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &       -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  ! -P13 ou -P31.
       DOUBLE PRECISION 
-     &    ARR(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! P22.
+     &    ARR(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! P22.
       DOUBLE PRECISION 
-     &    ART(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX,
-     &        -SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX) ! -P23 ou -P32.
+     &    ART(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX,
+     &        -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX) ! -P23 ou -P32.
      
            
       DOUBLE PRECISION BP0MJ
@@ -2963,10 +3195,11 @@ C*-----------------------------------------------------------------------
       DOUBLE PRECISION COEFK
       DOUBLE PRECISION COEFKP1 
       
+      INTEGER*4 NT   ! Nombre de couches du profil atmo
       INTEGER IS	! Ordre de la decomposition en series de Fourier.     
-      INTEGER K		! Indice de niveau du profil.
-      INTEGER J		! Indice d'angle d'incidence.
-      INTEGER*4 NBMU    ! Nombre d'angles effectifs des simulations
+      INTEGER K	! Indice de niveau du profil.
+      INTEGER J	! Indice d'angle d'incidence.
+      INTEGER*4 NBMU ! Nombre d'angles effectifs des simulations
       
        
 C* Traitements    
@@ -2974,20 +3207,21 @@ C*------------
 
 C* Initialisation
 
-      DO 10 J=-NBMU,NBMU
-         DO 10 K=0,SOS_OS_NT
-	    I2(K,J)=0.
-	    Q2(K,J)=0.
-	    U2(K,J)=0.
-10    CONTINUE      
+      DO J=-NBMU,NBMU
+         DO K=0,NT
+	      I2(K,J)=0.
+	      Q2(K,J)=0.
+	      U2(K,J)=0.
+         ENDDO    
+      ENDDO 
 
 
-      COEFNT  = DEXP(2.*H(SOS_OS_NT)/MUS) / 4.  
+      COEFNT  = DEXP(2.*H(NT)/MUS) / 4.  
 
       SPL=XPL(0)
 
       
-      DO 1500 K= 0 , SOS_OS_NT-1
+      DO 1500 K= 0 , NT-1
       
          YR=YDEL(K)
          XP=XDEL(K)
@@ -2997,16 +3231,16 @@ C* Initialisation
 	 
          DO 1502 J=1,NBMU
 
-C* Elements de matrice de phase pour le melange molecules + aerosols
+C* ElÃ©ments de matrice de phase pour le melange molecules + aerosols
             IF (IS.LE.2) THEN	 
 	    
                 BP0MJ=BP(0,-J)*XP+(BETA0+BETA2*XPL(-J)*SPL)*YR
                 BP0J=BP(0,J)*XXP+(BETA0+BETA2*XPL(J)*SPL)*YYR
             
                 GRJ0=GR(J,0)*XXP+YYR*XRL(0)*XPL(J)*GAMMA2
-	        GR0J=GR(0,J)*XXP+YYR*XRL(J)*XPL(0)*GAMMA2
+	         GR0J=GR(0,J)*XXP+YYR*XRL(J)*XPL(0)*GAMMA2
                 GR0MJ=GR(0,-J)*XP+YR*XRL(-J)*SPL*GAMMA2
-	        GRMJ0 =GR(-J,0)*XP+YR*GAMMA2*XRL(0)*XPL(-J)	
+	         GRMJ0 =GR(-J,0)*XP+YR*GAMMA2*XRL(0)*XPL(-J)	
 	    
                 GT0MJ=GT(0,-J)*XP+YR*GAMMA2*SPL*XTL(-J)
                 GT0J=GT(0,J)*XXP+YYR*GAMMA2*SPL*XTL(J)
@@ -3023,9 +3257,9 @@ C* Elements de matrice de phase pour le melange molecules + aerosols
                 BP0J=BP(0,J)*XXP
             
                 GRJ0=GR(J,0)*XXP
-	        GR0J=GR(0,J)*XXP
+	         GR0J=GR(0,J)*XXP
                 GR0MJ=GR(0,-J)*XP
-	        GRMJ0 =GR(-J,0)*XP
+	         GRMJ0 =GR(-J,0)*XP
 	    
                 GT0MJ=GT(0,-J)*XP
                 GT0J=GT(0,J)*XXP
@@ -3069,15 +3303,15 @@ C* Fonction source pour le champ descendant
 C*===========================================================================
 C PROCEDURE: SOS_PARAM_CONV
 C ==========
-C      Cette procedure calcule le parametre de convergence pour le test
+C      Cette procedure calcule le paramÃ¨tre de convergence pour le test
 C      de convergence en serie geometrique. 
 C
 C      Principe:
 C      --------
 C      On analyse la convergence en serie geometrique des diffusions 
-C      successives a partir des ordres IG-2, IG-1 et IG.
+C      successives Ã  partir des ordres IG-2, IG-1 et IG.
 C      Le test est realise pour le champ de luminance emergeant au TOA et pour
-C      le champ eclairant le sol. S'il y a convergence a ces limites, on admet
+C      le champ eclairant le sol. S'il y a convergence Ã  ces limites, on admet
 C      qu'il y a convergence dans toute l'atmosphere.
 C
 C      Supposons avoir un comportement de serie geometrique convergente a 
@@ -3089,46 +3323,46 @@ C		_ q' = G1 / D1  (rapport des ordres IG / IG-1 pour I)
 C     On teste que q et q' sont voisins (condition pour une approximation de
 C     serie geometrique).
 C     On teste en meme temps le rapport de la somme des termes de la serie
-C     geometrique convergente a partir de l'ordre IG (ordre IG / (1-q) )
+C     geometrique convergente Ã  partir de l'ordre IG (ordre IG / (1-q) )
 C     devant la somme des termes precedents
 C     (de 1 a IG-1, stockee dans I3, Q3 ou U3).
 C
-C     La routine sort le parametre de convergence Z1 qui est teste par le
+C     La routine sort le paramÃ¨tre de convergence Z1 qui est teste par le
 C     programme appelant.
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C
 C    NBMU (I4)    (E)  Nombre d'angles (positifs) effectivement utiles
 C
-C    I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)		
-C                         Parametre de Stokes I pour le cumul des
+C    I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)		
+C                         ParamÃ¨tre de Stokes I pour le cumul des
 C      		          ordres de diffusion precedent IG en cours.
-C    Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)  Parametre de Stokes Q.
-C    U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)  Parametre de Stokes U.
+C    Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)  ParamÃ¨tre de Stokes Q.
+C    U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)  ParamÃ¨tre de Stokes U.
 C            			
-C    A1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C       	          Parametre de Stokes I pour l'ordre IG-2. 
-C    B1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			  Parametre de Stokes Q pour l'ordre IG-2.
-C    C1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			  Parametre de Stokes U pour l'ordre IG-2.
+C    A1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C       	          ParamÃ¨tre de Stokes I pour l'ordre IG-2. 
+C    B1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			  ParamÃ¨tre de Stokes Q pour l'ordre IG-2.
+C    C1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			  ParamÃ¨tre de Stokes U pour l'ordre IG-2.
 C
-C    D1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			  Parametre de Stokes I pour l'ordre IG-1.	
-C    E1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			  Parametre de Stokes Q pour l'ordre IG-1.
-C    F1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			  Parametre de Stokes U pour l'ordre IG-1.
+C    D1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			  ParamÃ¨tre de Stokes I pour l'ordre IG-1.	
+C    E1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			  ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+C    F1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			  ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 C
-C    G1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      		          Parametre de Stokes I pour l'ordre IG.	
-C    H1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			  Parametre de Stokes Q pour l'ordre IG.
-C    P1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			  Parametre de Stokes U pour l'ordre IG.
+C    G1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      		          ParamÃ¨tre de Stokes I pour l'ordre IG.	
+C    H1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			  ParamÃ¨tre de Stokes Q pour l'ordre IG.
+C    P1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			  ParamÃ¨tre de Stokes U pour l'ordre IG.
 C
-C    Z1	   (double)   (S)    Parametre de convergence.
+C    Z1	   (double)   (S)    ParamÃ¨tre de convergence.
 C
 C
 C Common utilise:
@@ -3149,40 +3383,40 @@ C==============================================================================
 C* Definition des variables     
 C*------------------------------------------------------------------
 
-      DOUBLE PRECISION Z1	! Parametre de convergence.
+      DOUBLE PRECISION Z1	! ParamÃ¨tre de convergence.
 
 	! Fonctions pour le test de convergence en series geometrique,
 	! champ emergeant au TOA (mu > 0) et descendant au sol (mu < 0).
-	! Les fonctions sont etablies pour un ordre S du developpement
+	! Les fonctions sont etablies pour un ordre S du dÃ©veloppement
 	! en series de Fourier, en fonction de l'angle mu.		
-      DOUBLE PRECISION I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)		
-                                ! Parametre de Stokes I pour le cumul des
+      DOUBLE PRECISION I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)		
+                            ! ParamÃ¨tre de Stokes I pour le cumul des
       				! ordres de diffusion precedent IG en cours.
-      DOUBLE PRECISION Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes Q.
-      DOUBLE PRECISION U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes U.
+      DOUBLE PRECISION Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes U.
             			
-      DOUBLE PRECISION A1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-       				! Parametre de Stokes I pour l'ordre IG-2. 
-      DOUBLE PRECISION B1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG-2.
-      DOUBLE PRECISION C1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes U pour l'ordre IG-2.
+      DOUBLE PRECISION A1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+       			! ParamÃ¨tre de Stokes I pour l'ordre IG-2. 
+      DOUBLE PRECISION B1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG-2.
+      DOUBLE PRECISION C1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes U pour l'ordre IG-2.
 
-      DOUBLE PRECISION D1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG-1.
-      DOUBLE PRECISION E1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG-1.
-      DOUBLE PRECISION F1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG-1.
+      DOUBLE PRECISION D1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG-1.
+      DOUBLE PRECISION E1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+      DOUBLE PRECISION F1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 
-      DOUBLE PRECISION G1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG.
-      DOUBLE PRECISION H1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG.
-      DOUBLE PRECISION P1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG.
+      DOUBLE PRECISION G1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG.
+      DOUBLE PRECISION H1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG.
+      DOUBLE PRECISION P1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG.
 
       DOUBLE PRECISION Y	! Variable pour les tests d'arret.
 
@@ -3194,33 +3428,32 @@ C----------------------------------------------------------------------------
       Z1=0.D+00
 
       DO 99 K=-NBMU,NBMU
-         IF (K) 56,99,56
-   56    IF (A1(K).EQ.0.D+00) GO TO 51
-         IF (D1(K).EQ.0.D+00) GO TO 51
-         IF (I3(K).EQ.0.D+00) GO TO 51
-         Y=((G1(K)/D1(K)-D1(K)/A1(K))
-     &       /((1-G1(K)/D1(K))**2)*(G1(K)/I3(K)))
-         Z1=DMAX1(Z1,DABS(Y))
-	 
-   51    CONTINUE
-   
-         IF (B1(K).EQ.0.D+00) GO TO 53
-         IF (E1(K).EQ.0.D+00) GO TO 53
-         IF (Q3(K).EQ.0.D+00) GO TO 53
-         Y=((H1(K)/E1(K)-E1(K)/B1(K))
-     &       /((1-H1(K)/E1(K))**2)*(H1(K)/Q3(K)))
-         Z1=DMAX1(Z1,DABS(Y))
-	 
-   53    CONTINUE
-   
-         IF (C1(K).EQ.0.D+00) GO TO 55
-         IF (F1(K).EQ.0.D+00) GO TO 55
-         IF (U3(K).EQ.0.D+00) GO TO 55
-         Y=((P1(K)/F1(K)-F1(K)/C1(K))
-     &       /((1-P1(K)/F1(K))**2)*(P1(K)/U3(K)))
-         Z1=DMAX1(Z1,DABS(Y))
-	 
-   55    CONTINUE
+
+         IF (K.NE.0) THEN 
+ 
+            IF ((A1(K).NE.0.D+00).AND.(D1(K).NE.0.D+00)
+     &          .AND.(I3(K).NE.0.D+00)) THEN
+                Y=((G1(K)/D1(K)-D1(K)/A1(K))
+     &            /((1-G1(K)/D1(K))**2)*(G1(K)/I3(K)))
+                 Z1=DMAX1(Z1,DABS(Y))
+            ENDIF
+
+	    IF ((B1(K).NE.0.D+00).AND.(E1(K).NE.0.D+00)
+     &          .AND.(Q3(K).NE.0.D+00)) THEN
+                Y=((H1(K)/E1(K)-E1(K)/B1(K))
+     &            /((1-H1(K)/E1(K))**2)*(H1(K)/Q3(K)))
+                Z1=DMAX1(Z1,DABS(Y))
+            ENDIF
+
+	    IF ((C1(K).NE.0.D+00).AND.(F1(K).NE.0.D+00)
+     &          .AND.(U3(K).NE.0.D+00)) THEN
+                Y=((P1(K)/F1(K)-F1(K)/C1(K))
+     &            /((1-P1(K)/F1(K))**2)*(P1(K)/U3(K)))
+                Z1=DMAX1(Z1,DABS(Y))
+            ENDIF
+ 
+         ENDIF !Fin test K!=0
+ 
    
    99 CONTINUE
 
@@ -3230,30 +3463,112 @@ C----------------------------------------------------------------------------
 
 
 
+C*============================================================================
+C PROCEDURE: SOS_ARRET_DIFFUS_1
+C ==========
+C      Cette procedure prepare le test d'arret sur les diffusions quand les 
+c      termes I, Q, U sont tres petits
+C
+C
+C Description des paramÃ¨tres
+C -------------------------- 
+C    
+C    NBMU (I4) (E)  Nombre d'angles (positifs) effectivement utiles
+C
+C    I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E)
+C    Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E)
+C    U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E)
+C      	 Champ de luminance d'ordre IG en fonction du niveau du 
+C	        profil et de la direction.       	
+C
+C
+C    Z1   (double)   (S)    Variable seuil pour les tests d'arret.
+C
+C
+C Common utilise:
+C --------------
+C     Aucun
+C
+C Cas d'erreur :
+C ------------
+C     Aucun
+C
+C==============================================================================
+      SUBROUTINE SOS_ARRET_DIFFUS_1(NBMU,NT,I1,Q1,U1,Z1)
+      
+      IMPLICIT NONE
+      
+
+C* Definition des variables     
+C*------------------------------------------------------------------
+
+      DOUBLE PRECISION Z1	! Variable seuil pour les tests d'arret.
+
+      	! Champ de luminance d'ordre IG en fonction du niveau du profil
+	! et de la direction.       	
+      DOUBLE PRECISION I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ I.
+      DOUBLE PRECISION Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ Q.
+      DOUBLE PRECISION U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ U.
+ 
+      INTEGER*4 NT	! Nombre de couches du profil atmo
+      INTEGER*4 IND	! Numero de couche pour les mu > 0 ou mu < 0
+      INTEGER*4 K 
+      INTEGER*4 NBMU ! Nombre d'angles effectifs des simulations
+
+C------------------------------------------------------ 
+C* On compare la valeur du terme d'ordre IG a la somme des 
+C* termes precedents.
+C* Determination de la valeur maximale de leur rapport
+C* pour le champ montant au TOA et descendant au sol.
+C------------------------------------------------------
+      Z1=0.D+00
+      DO 88 K=-NBMU,NBMU
+
+	 IF (K.NE.0) THEN
+	 
+	    IF (K.LT.0) THEN
+	       IND=NT		! Au sol	 
+	    ELSE
+	       IND=0		! Au TOA
+	    ENDIF
+    
+            Z1=DMAX1(Z1,DABS(I1(IND,K)))
+	    
+            Z1=DMAX1(Z1,DABS(Q1(IND,K)))
+	    
+            Z1=DMAX1(Z1,DABS(U1(IND,K)))
+
+	 ENDIF	 
+	 
+   88 CONTINUE
+   
+      RETURN
+
+      END  	!FIN DE LA PROCEDURE SOS_ARRET_DIFFUS_1
 
 C*============================================================================
-C PROCEDURE: SOS_ARRET_DIFFUS
+C PROCEDURE: SOS_ARRET_DIFFUS_2
 C ==========
 C      Cette procedure prepare le test d'arret sur les diffusions quand les 
 c      termes suivant deviennent tres petits
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C    
 C    NBMU (I4) (E)  Nombre d'angles (positifs) effectivement utiles
 C
-C    I1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E)
-C    Q1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E)
-C    U1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E)
+C    I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E)
+C    Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E)
+C    U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E)
 C      	 Champ de luminance d'ordre IG en fonction du niveau du 
 C	 profil et de la direction.       	
 C
-C    I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)	
-C            Parametre de Stokes I pour le cumul des ordres de diffusion 
+C    I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)	
+C            ParamÃ¨tre de Stokes I pour le cumul des ordres de diffusion 
 C            precedent IG en cours.
-C    Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) Parametre de Stokes Q.
-C    U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) Parametre de Stokes U
+C    Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) ParamÃ¨tre de Stokes Q.
+C    U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) ParamÃ¨tre de Stokes U
 C
 C    Z1	   (double)   (S)    Variable seuil pour les tests d'arret.
 C
@@ -3267,7 +3582,7 @@ C ------------
 C     Aucun
 C
 C==============================================================================
-      SUBROUTINE SOS_ARRET_DIFFUS(NBMU,I1,Q1,U1,I3,Q3,U3,Z1)
+      SUBROUTINE SOS_ARRET_DIFFUS_2(NBMU,NT,I1,Q1,U1,I3,Q3,U3,Z1)
       
       IMPLICIT NONE
       
@@ -3279,27 +3594,28 @@ C*------------------------------------------------------------------
 
       	! Champ de luminance d'ordre IG en fonction du niveau du profil
 	! et de la direction.       	
-      DOUBLE PRECISION I1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ I.
-      DOUBLE PRECISION Q1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ Q.
-      DOUBLE PRECISION U1(0:SOS_OS_NT,-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	! Champ U.
+      DOUBLE PRECISION I1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ I.
+      DOUBLE PRECISION Q1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ Q.
+      DOUBLE PRECISION U1(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	! Champ U.
 
 	! Fonctions pour le test de convergence en series geometrique,
 	! champ emergeant au TOA (mu > 0) et descendant au sol (mu < 0).
-	! Les fonctions sont etablies pour un ordre S du developpement
+	! Les fonctions sont etablies pour un ordre S du dÃ©veloppement
 	! en series de Fourier, en fonction de l'angle mu.	
-      DOUBLE PRECISION I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)		
-                                ! Parametre de Stokes I pour le cumul des
+      DOUBLE PRECISION I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)		
+                            ! ParamÃ¨tre de Stokes I pour le cumul des
       				! ordres de diffusion precedent IG en cours.
-      DOUBLE PRECISION Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes Q.
-      DOUBLE PRECISION U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes U.
+      DOUBLE PRECISION Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes U.
  
       DOUBLE PRECISION Y	! Variable pour les tests d'arret.
 
-      INTEGER*4 IND		! Numero de couche pour les mu > 0 ou mu < 0
+      INTEGER*4 NT	! Nombre de couches du profil atmo
+      INTEGER*4 IND	! Numero de couche pour les mu > 0 ou mu < 0
       INTEGER*4 K 
-      INTEGER*4 NBMU    ! Nombre d'angles effectifs des simulations
+      INTEGER*4 NBMU ! Nombre d'angles effectifs des simulations
 
 C------------------------------------------------------ 
 C* On compare la valeur du terme d'ordre IG a la somme des 
@@ -3309,32 +3625,39 @@ C* pour le champ montant au TOA et descendant au sol.
 C------------------------------------------------------
       Z1=0.D+00
       DO 88 K=-NBMU,NBMU
-      
-         IF(K) 91,88,93
+      	 
+	 IF (K.NE.0) THEN
 	 
-  91     IND=SOS_OS_NT		! Au sol
-         GOTO 95
+	    IF (K.LT.0) THEN
+	       IND=NT		! Au sol	 
+	    ELSE
+	       IND=0		! Au TOA
+	    ENDIF
+	
+
+	    IF (I3(K).NE.0.D+00) THEN
+                Y=I1(IND,K)/I3(K)
+                Z1=DMAX1(Z1,DABS(Y))
+	    ENDIF
+	    	 
+            IF (Q3(K).NE.0.D+00) THEN
+                Y=Q1(IND,K)/Q3(K)
+                Z1=DMAX1(Z1,DABS(Y))
+	    ENDIF
 	 
-  93     IND=0			! Au TOA
-  
-  95     IF (I3(K).EQ.0.D+00) GO TO 92
-  
-         Y=I1(IND,K)/I3(K)
-         Z1=DMAX1(Z1,DABS(Y))
+            IF (U3(K).NE.0.D+00) THEN
+                Y=U1(IND,K)/U3(K)
+                Z1=DMAX1(Z1,DABS(Y))
+	    ENDIF
 	 
-   92    IF (Q3(K).EQ.0.D+00) GO TO 94
-   
-         Y=Q1(IND,K)/Q3(K)
-         Z1=DMAX1(Z1,DABS(Y))
+	 ENDIF !Fin test K!=0
 	 
-   94    IF (U3(K).EQ.0.D+00) GO TO 88
-   
-         Y=U1(IND,K)/U3(K)
-         Z1=DMAX1(Z1,DABS(Y))
+	 
    88 CONTINUE
    
       RETURN
-      END  	!FIN DE LA PROCEDURE SOS_ARRET_DIFFUS
+      END  	!FIN DE LA PROCEDURE SOS_ARRET_DIFFUS_2
+
 
 
 
@@ -3346,29 +3669,29 @@ C      Cette procedure prepare le test d'arret sur la decomposition en
 c      serie fourier.
 c
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
 C
 C    NBMU (I4) (E)  Nombre d'angles (positifs) effectivement utiles
 C
-C    I4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) 	
-C    Q4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) 
-C    U4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) 
+C    I4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) 	
+C    Q4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) 
+C    U4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) 
 C        Tableaux de sommation des ordres S de la decomposition
 C        en series de Fourier, en fonction de l'angle mu.
 C
-C    I5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) 	
-C    Q5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) 
-C    U5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) 	
+C    I5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) 	
+C    Q5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) 
+C    U5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) 	
 C        Tableaux de sommation des ordres S de la decomposition
 C        en series de Fourier, avec permutation du signe des ordres S,
-C	 en fonction de l'angle mu.
+C	  en fonction de l'angle mu.
 C
-C    I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)	
-C            Parametre de Stokes I pour le cumul des ordres de diffusion 
+C    I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)	
+C            ParamÃ¨tre de Stokes I pour le cumul des ordres de diffusion 
 C            precedent IG en cours.
-C    Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) Parametre de Stokes Q.
-C    U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E) Parametre de Stokes U
+C    Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) ParamÃ¨tre de Stokes Q.
+C    U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E) ParamÃ¨tre de Stokes U
 C
 C    Z1	   (double)   (S)    Variable seuil pour les tests d'arret.
 C
@@ -3395,27 +3718,27 @@ C*------------------------------------------------------------------
 
 	! Tableaux de sommation des ordres S de la decomposition
         ! en series de Fourier, en fonction de l'angle mu.
-      DOUBLE PRECISION I4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      DOUBLE PRECISION Q4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      DOUBLE PRECISION U4(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
+      DOUBLE PRECISION I4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      DOUBLE PRECISION U4(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
 
         ! Tableaux de sommation des ordres S de la decomposition
         ! en series de Fourier, avec permutation du signe des ordres S,
 	! en fonction de l'angle mu.
-      DOUBLE PRECISION I5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      DOUBLE PRECISION Q5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      DOUBLE PRECISION U5(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
+      DOUBLE PRECISION I5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      DOUBLE PRECISION Q5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      DOUBLE PRECISION U5(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
 
 	! Champ emergeant au TOA (mu > 0) et descendant au sol (mu < 0).
-	! Les fonctions sont etablies pour un ordre S du developpement
+	! Les fonctions sont etablies pour un ordre S du dÃ©veloppement
 	! en series de Fourier, en fonction de l'angle mu.
-      DOUBLE PRECISION I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)		
-                                ! Parametre de Stokes I pour le cumul des
+      DOUBLE PRECISION I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)		
+                            ! ParamÃ¨tre de Stokes I pour le cumul des
       				! ordres de diffusion precedent IG en cours.
-      DOUBLE PRECISION Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes Q.
-      DOUBLE PRECISION U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes U.
+      DOUBLE PRECISION Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes U.
  
 
       DOUBLE PRECISION Y	! Variable pour les tests d'arret.
@@ -3430,7 +3753,7 @@ C* a la somme des contributions precedentes.
 C* On sort la valeur maximale Z1 de ce rapport pour le champ emergant 
 C* au TOA et descendant au niveau du sol.
 C* Si la contribution relative (en valeur absolue) est inferieure
-C* au seuil SOS_PH_SEUIL_SF on arrete la decomposition en series de Fourier
+C* au seuil CTE_PH_SEUIL_SF on arrete la decomposition en series de Fourier
 C* dans le programme appelant.
 C----------------------------------------------------------------------------
       Z1=0.D+00
@@ -3484,56 +3807,56 @@ C      de la queue de la serie geometrique a la somme des diffusions
 C      precedentes.
 C
 C
-C Description des parametres
+C Description des paramÃ¨tres
 C -------------------------- 
+C
+C    NT (I4) : (E) Nombre de couches dans le profil atmospherique 
 C
 C    NBMU (I4) (E)  Nombre d'angles (positifs) effectivement utiles
 C
-C    D1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                            Parametre de Stokes I pour l'ordre IG-1.	
-C    E1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      		             Parametre de Stokes Q pour l'ordre IG-1.
-C    F1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes U pour l'ordre IG-1.
+C    D1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                            ParamÃ¨tre de Stokes I pour l'ordre IG-1.	
+C    E1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      		             ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+C    F1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			     ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 C
-C    G1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes I pour l'ordre IG.	
-C    H1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes Q pour l'ordre IG.
-C    P1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes U pour l'ordre IG.
+C    G1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			     ParamÃ¨tre de Stokes I pour l'ordre IG.	
+C    H1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			     ParamÃ¨tre de Stokes Q pour l'ordre IG.
+C    P1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			     ParamÃ¨tre de Stokes U pour l'ordre IG.
 C
-C    D1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E) 
-C                            Parametre de Stokes I pour l'ordre IG-1
-C                            (fonctions pour le niveau de sortie 
-C                             des resultats)	
-C    E1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      		             Parametre de Stokes Q pour l'ordre IG-1.
-C    F1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes U pour l'ordre IG-1.
+C    D1OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E) 
+C                            ParamÃ¨tre de Stokes I pour l'ordre IG-1
+C                            (fonctions pour le profil de sortie des resultats)	
+C    E1OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      		             ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+C    F1OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			     ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 C
-C    G1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes I pour l'ordre IG.
-C                            (fonctions pour le niveau de sortie 
-C                             des resultats)		
-C    H1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes Q pour l'ordre IG.
-C    P1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E)
-C      			     Parametre de Stokes U pour l'ordre IG.
+C    G1OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			 ParamÃ¨tre de Stokes I pour l'ordre IG.
+C                            (fonctions pour le profil de sortie des resultats)		
+C    H1OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			     ParamÃ¨tre de Stokes Q pour l'ordre IG.
+C    P1OUT(-0:CTE_OS_NT,CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E)
+C      			     ParamÃ¨tre de Stokes U pour l'ordre IG.
 C
 C
-C    I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E/S)	
-C            Parametre de Stokes I pour le cumul des ordres de diffusion 
+C    I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E/S)	
+C            ParamÃ¨tre de Stokes I pour le cumul des ordres de diffusion 
 C            precedent IG en cours.
-C    Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E/S) Parametre de Stokes Q.
-C    U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)   (double)  (E/S) Parametre de Stokes U
+C    Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E/S) ParamÃ¨tre de Stokes Q.
+C    U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)   (double)  (E/S) ParamÃ¨tre de Stokes U
 C
-C    I3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E/S)	
-C            Parametre de Stokes I pour un ordre S du developpement en 
-C            series de Fourier, en fonction de l'angle mu (niveau de sortie 
+C    I3OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E/S)	
+C            ParamÃ¨tre de Stokes I pour un ordre S du dÃ©veloppement en 
+C            series de Fourier, en fonction de l'angle mu (profil de sortie 
 C            des resultats).
-C    Q3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E/S) Parametre de Stokes Q.
-C    U3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  (double)  (E/S) Parametre de Stokes U.
+C    Q3OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E/S) ParamÃ¨tre de Stokes Q.
+C    U3OUT(0:CTE_OS_NT,-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  (double)  (E/S) ParamÃ¨tre de Stokes U.
 C
 C
 C Common utilise:
@@ -3545,7 +3868,7 @@ C ------------
 C     Aucun
 C
 C==============================================================================
-      SUBROUTINE SOS_AJOUT_QUEUE(NBMU,D1,E1,F1,G1,H1,P1,
+      SUBROUTINE SOS_AJOUT_QUEUE(NT,NBMU,D1,E1,F1,G1,H1,P1,
      &                           D1OUT,E1OUT,F1OUT,
      &                           G1OUT,H1OUT,P1OUT,
      &                           I3,Q3,U3,I3OUT,Q3OUT,U3OUT)
@@ -3557,54 +3880,63 @@ C* Definition des variables
 C*------------------------------------------------------------------
 
 	! Champ emergeant au TOA (mu > 0) et descendant au sol (mu < 0).
-	! Les fonctions sont etablies pour un ordre S du developpement
+	! Les fonctions sont etablies pour un ordre S du dÃ©veloppement
 	! en series de Fourier, en fonction de l'angle mu.	
-      DOUBLE PRECISION I3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)		
-                                ! Parametre de Stokes I pour le cumul des
+      DOUBLE PRECISION I3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)		
+                            ! ParamÃ¨tre de Stokes I pour le cumul des
       				! ordres de diffusion precedent IG en cours.
-      DOUBLE PRECISION Q3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes Q.
-      DOUBLE PRECISION U3(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)  
-      				! Parametre de Stokes U
+      DOUBLE PRECISION Q3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)  
+      				! ParamÃ¨tre de Stokes U
 				
-      DOUBLE PRECISION D1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG-1.
-      DOUBLE PRECISION E1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG-1.
-      DOUBLE PRECISION F1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG-1.
+      DOUBLE PRECISION D1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG-1.
+      DOUBLE PRECISION E1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+      DOUBLE PRECISION F1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 
-      DOUBLE PRECISION G1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG.
-      DOUBLE PRECISION H1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG.
-      DOUBLE PRECISION P1(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG.
+      DOUBLE PRECISION G1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG.
+      DOUBLE PRECISION H1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG.
+      DOUBLE PRECISION P1(-CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG.
 
 	! Memes fonctions pour le niveau de sortie des resultats:
-      DOUBLE PRECISION D1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG-1.
-      DOUBLE PRECISION E1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG-1.
-      DOUBLE PRECISION F1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG-1.
+      DOUBLE PRECISION D1OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG-1.
+      DOUBLE PRECISION E1OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG-1.
+      DOUBLE PRECISION F1OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG-1.
 
-      DOUBLE PRECISION G1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes I pour l'ordre IG.
-      DOUBLE PRECISION H1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      				! Parametre de Stokes Q pour l'ordre IG.
-      DOUBLE PRECISION P1OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)
-      			  	! Parametre de Stokes U pour l'ordre IG.
+      DOUBLE PRECISION G1OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes I pour l'ordre IG.
+      DOUBLE PRECISION H1OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      				! ParamÃ¨tre de Stokes Q pour l'ordre IG.
+      DOUBLE PRECISION P1OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)
+      			  	! ParamÃ¨tre de Stokes U pour l'ordre IG.
 
 
-      DOUBLE PRECISION I3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      				!(S)   Parametre de Stokes I pour un ordre S
-      				!      du developpement en series de Fourier,
+      DOUBLE PRECISION I3OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				!(S)   ParamÃ¨tre de Stokes I pour un ordre S
+      				!      du dÃ©veloppement en series de Fourier,
 				!      en fonction de l'angle mu.
-      DOUBLE PRECISION Q3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      				!(S)   Parametre de Stokes Q.
-      DOUBLE PRECISION U3OUT(-SOS_OS_NBMU_MAX:SOS_OS_NBMU_MAX)	
-      				!(S)   Parametre de Stokes U.
+      DOUBLE PRECISION Q3OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				!(S)   ParamÃ¨tre de Stokes Q.
+      DOUBLE PRECISION U3OUT(0:CTE_OS_NT,
+     &			     -CTE_OS_NBMU_MAX:CTE_OS_NBMU_MAX)	
+      				!(S)   ParamÃ¨tre de Stokes U.
 
 
       DOUBLE PRECISION I1QUEUE	
@@ -3614,8 +3946,9 @@ C*------------------------------------------------------------------
       DOUBLE PRECISION U1QUEUE
       		! Valeur estimee de la queue de serie geometrique pour U.
 
-      INTEGER*4 J
+      INTEGER*4 I,J
       INTEGER*4 NBMU    ! Nombre d'angles effectifs des simulations
+      INTEGER*4 NT	! Nombre de couches du profil atmospherique
 
 C* Pour le champ emergeant au TOA et descendant au sol
 C------------------------------------------------------
@@ -3653,28 +3986,32 @@ C------------------------------------------------------------------------
       
          IF (J.EQ.0) GOTO 612
 	
-         IF (D1OUT(J).EQ.0.) THEN
-            I1QUEUE = 0.
-         ELSE	
-            I1QUEUE = G1OUT(J) / ( 1-G1OUT(J)/D1OUT(J) )
-         ENDIF
+	  DO I=0,NT
+	 
+         	IF (D1OUT(I,J).EQ.0.) THEN
+            	     I1QUEUE = 0.
+         	ELSE	
+            	     I1QUEUE = G1OUT(I,J) / ( 1-G1OUT(I,J)/D1OUT(I,J) )
+         	ENDIF
 	 	
-         IF (E1OUT(J).EQ.0.) THEN
-            Q1QUEUE = 0.
-         ELSE	
-            Q1QUEUE = H1OUT(J) / ( 1-H1OUT(J)/E1OUT(J) )
-         ENDIF	
+         	IF (E1OUT(I,J).EQ.0.) THEN
+            	     Q1QUEUE = 0.
+         	ELSE	
+            	     Q1QUEUE = H1OUT(I,J) / ( 1-H1OUT(I,J)/E1OUT(I,J) )
+         	ENDIF	
 	
-         IF (F1OUT(J).EQ.0.) THEN
-            U1QUEUE = 0.
-         ELSE	
-            U1QUEUE = P1OUT(J) / ( 1-P1OUT(J)/F1OUT(J) )
-         ENDIF	
+         	IF (F1OUT(I,J).EQ.0.) THEN
+            	     U1QUEUE = 0.
+         	ELSE	
+            	     U1QUEUE = P1OUT(I,J) / ( 1-P1OUT(I,J)/F1OUT(I,J) )
+         	ENDIF	
 
-         I3OUT(J)=I3OUT(J)+I1QUEUE
-         Q3OUT(J)=Q3OUT(J)+Q1QUEUE
-         U3OUT(J)=U3OUT(J)+U1QUEUE
-	   	
+         	I3OUT(I,J)=I3OUT(I,J)+I1QUEUE
+         	Q3OUT(I,J)=Q3OUT(I,J)+Q1QUEUE
+         	U3OUT(I,J)=U3OUT(I,J)+U1QUEUE
+	   
+	  ENDDO  
+	 	
   612 CONTINUE
 
       RETURN

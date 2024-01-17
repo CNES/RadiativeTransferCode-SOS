@@ -1,20 +1,20 @@
 C******************************************************************************
-C* Copyright 2017, Centre National d'Etudes Spatiales (CNES)
+C* Copyright 2023, Centre National d'Etudes Spatiales (CNES)
 C* 
-C* This file is part of SOS.
+C* This file is part of the SOS-ABS radiative transfer code.
 C* 
-C* SOS is free software: you can redistribute it and/or modify
+C* SOS-ABS is free software: you can redistribute it and/or modify
 C* it under the terms of the GNU General Public License as published by
 C* the Free Software Foundation, either version 3 of the License, or
 C* (at your option) any later version.
 C* 
-C* SOS is distributed in the hope that it will be useful,
+C* SOS-ABS is distributed in the hope that it will be useful,
 C* but WITHOUT ANY WARRANTY; without even the implied warranty of
 C* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 C* GNU General Public License for more details.
 C* 
 C* You should have received a copy of the GNU General Public License
-C* along with SOS. If not, see <http://www.gnu.org/licenses/>.
+C* along with SOS-ABS. If not, see <http://www.gnu.org/licenses/>.
 C******************************************************************************
 
 
@@ -30,66 +30,72 @@ C*       ==> Ajoute des angles utilisateurs de poids nuls (sans impact sur les v
 C*       ==> Ajoute l'angle zenithal solaire (de poids nuls).
 C*
 C* AUTEUR: 
-C*   Code de Gauss initial: Laboratoire d'Optique Atmospherique (LOA, Villeneuve d'Ascq).
-C*   Reprise du codage et developpements complementaires : CS SI, B.Lafrance.
-C*
-C*
+C*   CS GROUP France, B.Lafrance, 
+
 C* MOD:VERSION:1.0: 11/01/2010 Creation
 C*
-C*                                   
-C*    - Ajout de la constante SOS_DEFAULT_NBMU_LUM (de SOS.h) pour affectation par
-C*      defaut au nombre d'angles de Gauss a utiliser NBMU_GAUSS s'il n'est pas precise
-C*      par l'utilisateur 
-C*
 C* MOD:VERSION:1.1: 24/06/2010 
-C*     Les etiquettes de FORMAT en ,X, passent en ,1X, pour eviter des erreurs de compilation.
-C*   
-C* MOD:VERSION:1.2: 08/12/2015
-C*    - Suppression des formats � la lecture des param�tres d'entr�e en faveur 
-C*      de READ(PROG_ARG,*,ERR=NNN)
-C*      ==> Permet une compilation sous gfortran et �vite les mauvaises conversions 
-C*          si la valeur d'entr�e ne respecte pas strictement le format attendu 
-C*          (par exemple, saisie d'un entier N au lieu d'un r�el N. 
-C*           aboutissant � une valeur interpr�t�e fausse). 
+C*    - Ajout de la constante CTE_DEFAULT_NBMU_LUM (de SOS.h) pour affectation par
+C*      defaut au nombre d'angles de Gauss a utiliser NBMU_GAUSS s'il n'est pas précisé
+C*      par l'utilisateur 
+C*    - Les etiquettes de FORMAT en ,X, passent en ,1X, pour eviter des erreurs de compilation.
 C*
+C* MOD:VERSION:6.0: 06/06/2013
 C*
+C*   -  Les paramètres d'entrée sont fournis sous la forme de liste de paramètres
+C*      et non plus sous la forme de couples avec mot cle associe => tous les
+C*	 paramètres deviennent donc obligatoires
+C*
+C*   -  Modification de la valeur de Pi, declaree en constante dans le fichier
+C*      (INCTE_PI remplace SOS_PI)
+C*
+C* MOD:VERSION:6.1: 31/08/2022
+C*    - Renommage des constantes de SOS_* en CTE_*
+C*    - Clarification du fichier résultat : colonne OUTPUT renommée USER_ANGLE 
+C*    - Conversion des traces en Anglais.
+C*
+C* MOD:VERSION:6.2: 26/09/2023
+C*    - Modification de la syntaxe du test sur XDD dans la routine SOS_GAUSS pour
+C*      compatibilité avec Fortran 2018 pour compilateur gcc/10.2.0
+C*    
+C*    
 C******************************************************************************
 
 C----------------------------------------------------------------------------
 C Definition des constantes  
 C---------------------------------------------------------------------------- 
 C Constantes utilisees :
-C    SOS_LENFIC2 : Longueur des noms de fichiers avec arborescence.
-C    SOS_LENKEYWORD : Taille maximale des Keywords pour le passage des arguments.
-C    SOS_NBMAX_USER_ANGLES : Nombre maximal d'angles utilisateurs
-C    SOS_PI : Valeur de PI
-C    SOS_MIE_NBMU_MAX : Nombre maximal d'angles de Gauss positifs 
+C    CTE_LENFIC2 : Longueur des noms de fichiers avec arborescence.
+C    CTE_LENKEYWORD : Taille maximale des Keywords pour le passage des arguments.
+C    CTE_NBMAX_USER_ANGLES : Nombre maximal d'angles utilisateurs
+C    INCTE_PI : Valeur de PI
+C    CTE_MIE_NBMU_MAX : Nombre maximal d'angles de Gauss positifs 
 C                       pour les calculs de MIE
-C    SOS_OS_NBMU_MAX  : Nombre maximal d'angles de Gauss positifs 
+C    CTE_OS_NBMU_MAX  : Nombre maximal d'angles de Gauss positifs 
 C                       pour les calculs de luminance
-C    SOS_OS_NB_MAX :    Valeur maximale pour l'ordre limite du developpement en 
+C    CTE_OS_NB_MAX :    Valeur maximale pour l'ordre limite du développement en 
 C                       polynomes de Legendre.
-C    SOS_OS_NS_MAX :    Valeur maximale pour l'ordre limite du developpement en polynomes 
+C    CTE_OS_NS_MAX :    Valeur maximale pour l'ordre limite du développement en polynomes 
 C                       de Legendre des elements de la matrice de Fresnel 
 C                       et en series de Fourier des luminances.
-C    SOS_OS_NM_MAX :    Valeur maximale pour l'ordre limite  du developpement 
+C    CTE_OS_NM_MAX :    Valeur maximale pour l'ordre limite  du développement 
 C                       en series de Fourier de la fonction G.
-C    SOS_NBANGLES_MAX : Nombre maximal d'angles positifs pour la 
+C    CTE_NBANGLES_MAX : Nombre maximal d'angles positifs pour la 
 C                       declaration des tableaux XMU et XHR de la routine    
-C    SOS_DEFAULT_NBMU_MIE : Nombre d'angles de Gauss positifs par defaut pour les 
+C    CTE_DEFAULT_NBMU_MIE : Nombre d'angles de Gauss positifs par defaut pour les 
 C                           calculs de fonctions de phase (si non renseigne par l'utilisateur).
-C    SOS_DEFAULT_OS_NB : Ordre par defaut des developpements des fonctions de phase 
+C    CTE_DEFAULT_OS_NB : Ordre par defaut des développements des fonctions de phase 
 C                        en Polynomes de Legendre.
-C    SOS_DEFAULT_NBMU_LUM : Nombre d'angles de Gauss positifs par defaut pour les 
+C    CTE_DEFAULT_NBMU_LUM : Nombre d'angles de Gauss positifs par defaut pour les 
 C                           calculs de luminance (si non renseigne par l'utilisateur).
-C    SOS_DEFAULT_OS_NS    : Ordre maximal par defaut du developpement en polynomes de Legendre   
+C    CTE_DEFAULT_OS_NS    : Ordre maximal par defaut du développement en polynomes de Legendre   
 C                           des elements de la matrice de Fresnel.
-C    SOS_DEFAULT_OS_NM    : Ordre maximal par defaut du developpement en series de Fourier  
+C    CTE_DEFAULT_OS_NM    : Ordre maximal par defaut du développement en series de Fourier  
 C                           de la fonction G des calculs de matrice de reflexion.
-C    SOS_SEUIL_ECART_MUS  : Seuil pour le test d'ecart entre cos(teta(j)) et cos(tetas).
+C    CTE_SEUIL_ECART_MUS  : Seuil pour le test d'ecart entre cos(teta(j)) et cos(tetas).
 C----------------------------------------------------------------------------
 #include "SOS.h"
-
+#define INCTE_PI DACOS(-1.D+00)
 
 
 C==============================================================================
@@ -98,102 +104,92 @@ C ==========
 C      Programme de generation des fichiers d'angles utilises par les codes SOS_AEROSOLS,
 C      SOS_SURFACE et SOS.
 C
-C Donnees en entree du programme 
+C Donnees en entrée du programme 
 C ------------------------------
-C    -->Les parametres/arguments du programme
+C    -->Les paramètres/arguments du programme
 C
-C        Les arguments sont passes sous la forme d'une liste de couples (-Keyword Value)
+C            NBMU_GAUSS_LUM (I4) : (E) Nombre d'angles de Gauss pour les calculs de luminance.
+C				           si il vaut CTE_NOT_DEFINED_VALUE_INT, alors on utilise 
+C				           par defaut la valeur CTE_DEFAULT_NBMU_LUM
 C
-C        Definition des mots clef, statut obligatoire / option, format de la valeur associee :
-C         -ANG.Rad.NbGauss  ==> Optionnel : si non defini, on utilise par defaut la valeur SOS_DEFAULT_NBMU_LUM 
-C            PROG_ARG (CHARACTER*10)  : Nombre d'angles de Gauss pour les calculs de luminance.
-C                                       (format de d�codage : libre --> Integer) 
+C 	     TETAS   (DOUBLE) : (E) Angle zenithal solaire en degrés (0 < tetas < 90).
+C      		               (angle complementaire : mus= -cos(tetas))
 C
-C         -ANG.Rad.UserAngFile  ==> Optionnel : 
-C             FICANGLES_USER_LUM (CHARACTER*SOS_LENFIC2) : nom complet du fichier des angles "utilisateurs"
-C                                                          pour les calculs de luminance et BRDF
-C                 (repertoire + nom fichier + extension)
+C            FICANGLES_USER_LUM (CHARACTER) : (E) nom complet du fichier des angles "utilisateurs"
+C                                                 pour les calculs de luminances.
+C                 			               (repertoire + nom fichier + extension)
 C
-C         -ANG.Rad.Thetas ==> Obligatoire 
-C 	      PROG_ARG (CHARACTER*10)  : Angle zenithal solaire en degres (0 < tetas < 90).
-C      		                        (angle complementaire : mus= -cos(tetas))
-C                                       (format de d�codage : libre --> Float)
+C            NBMU_GAUSS_MIE (I4) : (E) Nombre d'angles de Gauss pour les calculs de fonctions de phase
+C				           si il vaut CTE_NOT_DEFINED_VALUE_INT, alors on utilise 
+C				           par defaut la valeur CTE_DEFAULT_NBMU_MIE
 C
-C         -ANG.Rad.ResFile  ==> Obligatoire (chemin complet au fichier ANGLES_LUM) 
-C             FICRES_LUM (CHARACTER*SOS_LENFIC2) : nom complet du fichier des angles utilises 
-C                                                  pour les calculs de luminance et BRDF
-C                 (repertoire + nom fichier + extension)
+C            FICANGLES_USER_MIE (CHARACTER) : (E) nom complet du fichier des angles "utilisateurs"
+C                                                 pour les calculs de fonctions de phase.
+C                 			            (repertoire + nom fichier + extension)
 C
-C         -ANG.Aer.NbGauss  ==> Optionnel : si non defini, on utilise par defaut la valeur SOS_DEFAULT_NBMU_MIE 
-C            PROG_ARG (CHARACTER*10)  : Nombre d'angles de Gauss pour les calculs de fonctions de phase.
-C                                       (format de d�codage : libre --> Integer) 
+C            FICLOG (CHARACTER): (E) nom complet du fichier trace (repertoire + nom fichier + extension)
+C                                    ou =0, si pas de  trace	 
 C
-C         -ANG.Aer.UserAngFile  ==> Optionnel : 
-C             FICANGLES_USER_MIE (CHARACTER*SOS_LENFIC2) : nom complet du fichier des angles "utilisateurs"
-C                                                          pour les calculs de fonctions de phase.
-C                 (repertoire + nom fichier + extension)
+C            FICRES_LUM (CHARACTER) : (E) nom complet du fichier des angles utilises 
+C                                         pour les calculs de luminance et BRDF
+C                 		          (repertoire + nom fichier + extension)
 C
-C         -ANG.Aer.ResFile  ==> Obligatoire (chemin complet au fichier ANGLES_LUM) 
-C             FICRES_MIE (CHARACTER*SOS_LENFIC2) : nom complet du fichier des angles utilises 
-C                                                  pour les calculs de fonctions de phase.
-C                 (repertoire + nom fichier + extension)
+C            FICRES_MIE (CHARACTER) : (E) nom complet du fichier des angles utilises 
+C                                         pour les calculs de fonctions de phase.
+C                 		          (repertoire + nom fichier + extension)
 C
-C         -ANG.Log ==> Obligatoire (0 ou chemin complet au fichier Trace)
-C             FICLOG (CHARACTER*SOS_LENFIC2): nom complet du fichier trace
-C                                            (repertoire + nom fichier + extension)
-C                                            ou =0, si pas de  trace	 
+C      	     IER (I4) : (S) code d'erreur =0 si pas d'erreur, =-1 sinon
 C
-C
-C Resultat fourni par la procedure
+C Resultat fourni par la procédure
 C --------------------------------
 C   Les fichiers decrivant les angles a utiliser pour les calculs de fonction de phase
 C   et pour les calculs de luminance + matrices de reflexion.
-C   Fichiers contenant egalement les parametres precisant les ordres de developpement
+C   Fichiers contenant également les paramètres precisant les ordres de développement
 C   des diverses fonctions : OS_NB (fonctions de phase), 
-C                            OS_NS (ordre max des developpements des
+C                            OS_NS (ordre max des développements des
 C                                   fonctions de Fresnel et des luminances)
-C   			     OS_NM (ordre maximal du developpement en series de Fourier  
+C   			        OS_NM (ordre maximal du développement en series de Fourier  
 C                                   de la fonction G des calculs de matrice de reflexion
 C 
 C Description des fichiers utilises
 C ---------------------------------
 C
 C    Fichier utilisateur FICANGLES_USER: 
-C           contient une liste d'angles (en degres) a ajouter aux angles de Gauss
+C           contient une liste d'angles (en degrés) a ajouter aux angles de Gauss
 C           pour lesquels le poids attribues sera nuls (=> sans impact sur les 
 C           integrations spatiales)
 C
 C        Format : Une valeur d'angle par ligne d'enregistrement.
-C                 Les angles doivent etre compris entre 0 et 90 degres.
-C                 Nombre d'enregistrements maximal : SOS_NBMAX_USER_ANGLES
+C                 Les angles doivent etre compris entre 0 et 90 degrés.
+C                 Nombre d'enregistrements maximal : CTE_NBMAX_USER_ANGLES
 C
 C    Fichier trace : identifiant = 99 
 C
 C    Fichier resultat FICRES_MIE:
 C           contient les informations suivantes
-C		NB_TOTAL_ANGLES :  nb d'angles total a utiliser
+C		  NB_TOTAL_ANGLES :  nb d'angles total a utiliser
 C               NB_GAUSS_ANGLES :  nb d'angles de Gauss
 C               ANGLES_USERFILE :  Nom du fichier des angles utilisateur
-C               INTERNAL_OS_NB :   Ordre des developpements des fonctions de phase 
-C				   en Polynomes de Legendre a utiliser.
-C               INDEX COS_ANGLE WEIGHT : lignes donnant le numero d'angle, son cosinus et son poids
+C               INTERNAL_OS_NB :   Ordre des développements des fonctions de phase 
+C				       en Polynomes de Legendre a utiliser.
+C               INDEX COS_ANGLE WEIGHT : lignes donnant le numéro d'angle, son cosinus et son poids
 C                                        au format I4,1X,2D21.14
 C
 C    Fichier resultat FICRES_LUM:
 C           contient les informations suivantes
-C		NB_TOTAL_ANGLES :    nb d'angles total a utiliser
+C		  NB_TOTAL_ANGLES :    nb d'angles total a utiliser
 C               NB_GAUSS_ANGLES :    nb d'angles de Gauss
-C               ANGLES_USERFILE :  Nom du fichier des angles utilisateur
-C	        SOLAR ZENITH ANGLE : Angle zenithal solaire (degres)
-C		INTERNAL_IMUS :      Numero d'indice de table correspondant
-C               INTERNAL_OS_NB :   Ordre des developpements des fonctions de phase 
-C				   en Polynomes de Legendre a utiliser.
-C               INTERNAL_OS_NS :     Ordre maximal a utiliser pour le developpement en
+C               ANGLES_USERFILE :    Nom du fichier des angles utilisateur
+C	         SOLAR ZENITH ANGLE : Angle zenithal solaire (degrés)
+C		  INTERNAL_IMUS :      Numéro d'indice de table correspondant
+C               INTERNAL_OS_NB :     Ordre des développements des fonctions de phase 
+C				         en Polynomes de Legendre a utiliser.
+C               INTERNAL_OS_NS :     Ordre maximal a utiliser pour le développement en
 C                                    polynomes de Legendre des elements de la matrice de Fresnel 
 C                                    et en series de Fourier des calculs de luminance.
-C               INTERNAL_OS_NM :     Ordre maximal du developpement en series de Fourier  
+C               INTERNAL_OS_NM :     Ordre maximal du développement en series de Fourier  
 C                                    de la fonction G des calculs de matrice de reflexion.
-C               INDEX COS_ANGLE WEIGHT OUTPUT: lignes donnant le numero d'angle, son cosinus 
+C               INDEX COS_ANGLE WEIGHT OUTPUT: lignes donnant le numéro d'angle, son cosinus 
 C                                              et son poids, s'il est donne en sortie "utilisateur"
 C                                              au format I4,1X,2D21.14,1X,I4
 C         
@@ -204,19 +200,19 @@ C  Aucun
 C
 C Cas d'erreur :
 C ------------
-C     - Decodage des parametres incorrect
+C     - Decodage des paramètres incorrect
 C     - Erreur dans un sous-programme
-C     - Erreur a l'ouverture, lecture et ecriture du fichier Trace 
+C     - Erreur a l'ouverture, lecture et écriture du fichier Trace 
 C       et des fichiers E/S :  fichier des angles utilisateurs et fichiers resultats
-C     - Parametres non valables
-C     - Incoherence de la dimension SOS_NBANGLES_MAX des tableaux d'angles de la routine 
+C     - Paramètres non valables
+C     - Incoherence de la dimension CTE_NBANGLES_MAX des tableaux d'angles de la routine 
 C       par rapport a celle des tableaux utilisees dans le code SOS :
-C          calculs de MIE : SOS_MIE_NBMU_MAX et de luminance : SOS_OS_NBMU_MAX.
-C     - Incoherence d'un angle utilisateur par rapport au domaine attendu (0 a 90 degres)
-C     - Nombre d'angles utilisateurs trop important devant SOS_NBMAX_USER_ANGLES
-C     - Nombre d'angles utiles (de Gauss + utilisateurs) trop important devant ???????  
+C          calculs de MIE : CTE_MIE_NBMU_MAX et de luminance : CTE_OS_NBMU_MAX.
+C     - Incoherence d'un angle utilisateur par rapport au domaine attendu (0 a 90 degrés)
+C     - Nombre d'angles utilisateurs trop important devant CTE_NBMAX_USER_ANGLES
+C     - Nombre d'angles utiles (de Gauss + utilisateurs) trop important devant CTE_OS_NBMU_MAX  
 C
-C     Affichage d'un message a l'ecran, arret du programme et 
+C     Affichage d'un message à l'écran, arret du programme et 
 C     retour du status 1 au shell
 C
 C
@@ -228,234 +224,139 @@ C      - SOS_GAUSS
 C
 C==============================================================================
 
-      PROGRAM SOS_ANGLES
+      SUBROUTINE SOS_ANGLES(NBMU_GAUSS_LUM, TETAS,  
+     &                      FICANGLES_USER_LUM,                 
+     &			       NBMU_GAUSS_MIE, FICANGLES_USER_MIE, 
+     &                      FICLOG,FICRES_LUM, FICRES_MIE, IER) 
       
       IMPLICIT NONE
 
 
 C Constantes ANGLES
 C -----------------
-      DOUBLE PRECISION CONVDEGRAD       !Coefficient de conversion des degres en radians.
-      PARAMETER (CONVDEGRAD=SOS_PI/180.D+00)
+      DOUBLE PRECISION CONVDEGRAD       !Coefficient de conversion des degrés en radians.
 
 C* Definition des variables                                                 
 C--------------------------------------------
       
       
-      DOUBLE PRECISION TETAS	! Angle zenithal solaire en degres (0 < tetas < 90).
-      				! (angle complementaire : mus= -cos(tetas))
+      DOUBLE PRECISION TETAS	! Angle zenithal solaire en degrés (0 < tetas < 90).
+      				       ! (angle complementaire : mus= -cos(tetas))
       DOUBLE PRECISION XMUS     ! Cosinus de l'angle zenithal solaire
-      DOUBLE PRECISION XMU(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !Cosinus des angles (de Gauss et utilisateur)
-      DOUBLE PRECISION XHR(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !Poids des angles (de Gauss et utilisateur)
-      INTEGER*2 IND_ANGOUT(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !Indices des tableaux d'angles pour lesquels 
+      DOUBLE PRECISION XMU(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !Cosinus des angles (de Gauss et utilisateur)
+      DOUBLE PRECISION XHR(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !Poids des angles (de Gauss et utilisateur)
+      INTEGER*2 IND_ANGOUT(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !Indices des tableaux d'angles pour lesquels 
       							       !il doit y avoir une sortie dans le fichier
-							       !r�sultat des angles utilisateur 
+							       !résultat des angles utilisateur 
 							       !(1 : pour une sortie requise)
-      DOUBLE PRECISION XMU_copy(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !copie de XMU avant ajout de TETAS
-      DOUBLE PRECISION XHR_copy(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !copie de XHR avant ajout de TETAS
-      INTEGER*2 IND_ANGOUT_copy(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !copie de IND_ANGOUT avant ajout de TETAS
+      DOUBLE PRECISION XMU_copy(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !copie de XMU avant ajout de TETAS
+      DOUBLE PRECISION XHR_copy(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !copie de XHR avant ajout de TETAS
+      INTEGER*2 IND_ANGOUT_copy(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !copie de IND_ANGOUT avant ajout de TETAS
       
-      INTEGER*2 NBARGS		        ! Nombre d'arguments en entr�e
-      INTEGER*2 DEF_NBMU_GAUSS_LUM      ! Indicateur d'affectation d'une valeur a NBMU_GAUSS_LUM
-      INTEGER*2 DEF_FICANGLES_USER_LUM  ! Indicateur d'affectation d'une valeur a FICANGLES_USER_LUM
-      INTEGER*2 DEF_FICRES_LUM  	! Indicateur d'affectation d'une valeur a FICRES_LUM
-      INTEGER*2 DEF_NBMU_GAUSS_MIE      ! Indicateur d'affectation d'une valeur a NBMU_GAUSS_MIE  
-      INTEGER*2 DEF_FICANGLES_USER_MIE  ! Indicateur d'affectation d'une valeur a FICANGLES_USER_MIE
-      INTEGER*2 DEF_FICRES_MIE  	! Indicateur d'affectation d'une valeur a FICRES_MIE
-      INTEGER*2 DEF_TETAS		! Indicateur d'affectation d'une valeur a TETAS
-      INTEGER*2 DEF_FICLOG	        ! Indicateur d'affectation d'une valeur a FICLOG  
-      
-      INTEGER*4 IARGC     	        ! Type de la fonction IARGC
-      INTEGER*4 NPARAM 		        ! Numero du parametre en entr�e (type INTEGER*4 obligatoire
-                                        ! pour le f77)
-      INTEGER*4 NBMU_GAUSS_LUM          ! Nombre d'angles de Gauss utilises pour les calculs de luminance      
-      INTEGER*4 NBMU_LUM                ! Nombre d'angles effectifs des simulations de luminance
-      INTEGER*4 NBMU_GAUSS_MIE          ! Nombre d'angles de Gauss utilises pour les calculs de Mie      
-      INTEGER*4 NBMU_MIE                ! Nombre d'angles effectifs des calculs de Mie
-      INTEGER*4 IER     		! code d'erreur =0 si pas d'erreur, =-1 sinon
-      INTEGER*4 J          		! Indices des tableaux d'angles
-      INTEGER*4 IMUS          		! Indice de l'angle zenithal solaire dans la table des angles
-      INTEGER*4 OS_NB 			! Ordre des developpements des fonctions de phase 
-					! en Polynomes de Legendre.
-      INTEGER*4 OS_NS    		! Ordre maximal du developpement en polynomes de Legendre   
-					! des elements de la matrice de Fresnel.
-      INTEGER*4 OS_NM    		! Ordre maximal du developpement en series de Fourier  
-					! de la fonction G des calculs de matrice de reflexion.
+      INTEGER*2 NBARGS           ! Nombre d'arguments en entrée
+     
+      INTEGER*4 IARGC     	     ! Type de la fonction IARGC
+      INTEGER*4 NPARAM 	     ! Numéro du paramètre en entrée (type INTEGER*4 obligatoire pour le f77)
+      INTEGER*4 NBMU_GAUSS_LUM   ! Nombre d'angles de Gauss utilises pour les calculs de luminance      
+      INTEGER*4 NBMU_LUM         ! Nombre d'angles effectifs des simulations de luminance
+      INTEGER*4 NBMU_GAUSS_MIE   ! Nombre d'angles de Gauss utilises pour les calculs de Mie      
+      INTEGER*4 NBMU_MIE         ! Nombre d'angles effectifs des calculs de Mie
+      INTEGER*4 IER     	     ! code d'erreur =0 si pas d'erreur, =-1 sinon
+      INTEGER*4 J          	     ! Indices des tableaux d'angles
+      INTEGER*4 IMUS             ! Indice de l'angle zenithal solaire dans la table des angles
+      INTEGER*4 OS_NB 	     ! Ordre des développements des fonctions de phase 
+				     ! en Polynomes de Legendre.
+      INTEGER*4 OS_NS    	     ! Ordre maximal du développement en polynomes de Legendre   
+				     ! des elements de la matrice de Fresnel.
+      INTEGER*4 OS_NM    	     ! Ordre maximal du développement en series de Fourier  
+				     ! de la fonction G des calculs de matrice de reflexion.
                
-      CHARACTER*SOS_LENFIC2 FICLOG              ! nom du fichier trace
+      CHARACTER*CTE_LENFIC2 FICLOG              ! nom du fichier trace
       			!Calculs de luminance :
-      CHARACTER*SOS_LENFIC2 FICANGLES_USER_LUM  ! chemin et nom du fichier des angles "utilisateurs"
-      CHARACTER*SOS_LENFIC2 FICRES_LUM          ! chemin et nom du fichier des angles utilises 
+      CHARACTER*CTE_LENFIC2 FICANGLES_USER_LUM  ! chemin et nom du fichier des angles "utilisateurs"
+      CHARACTER*CTE_LENFIC2 FICRES_LUM          ! chemin et nom du fichier des angles utilises 
       			!Calculs de fonctions de phase :
-      CHARACTER*SOS_LENFIC2 FICANGLES_USER_MIE  ! chemin et nom du fichier des angles "utilisateurs"
-      CHARACTER*SOS_LENFIC2 FICRES_MIE          ! chemin et nom du fichier des angles utilises 
-      
-      CHARACTER*SOS_LENKEYWORD KEYWORD	    ! Mot clef du passage d'arguments.
-
-      CHARACTER*10 PROG_ARG		    ! Arguments du programme
-
-      LOGICAL TRACE     ! = vrai,si ecriture dans le fichier trace
+      CHARACTER*CTE_LENFIC2 FICANGLES_USER_MIE  ! chemin et nom du fichier des angles "utilisateurs"
+      CHARACTER*CTE_LENFIC2 FICRES_MIE          ! chemin et nom du fichier des angles utilises 
       
 
-C* Lecture des parametres/arguments d'entree et decodage 
-C-------------------------------------------------------
 
-C --- Initialisation des indicateurs de definition des parametres (0 pour indefinis)
+      LOGICAL TRACE     ! = vrai,si écriture dans le fichier trace
       
-      DEF_NBMU_GAUSS_LUM=0
-      DEF_FICANGLES_USER_LUM=0   
-      DEF_TETAS=0
-      DEF_FICRES_LUM=0
-      DEF_NBMU_GAUSS_MIE=0
-      DEF_FICANGLES_USER_MIE=0  
-      DEF_FICRES_MIE=0
-      DEF_FICLOG=0                      
 
 
-C --- Nombre d'arguments en entree
-      NBARGS = IARGC()
-
-C --- Boucle de lecture des couples d'arguments       
-      DO NPARAM=1,NBARGS, 2
-         CALL GETARG(NPARAM,KEYWORD)
-	 
-	 IF (KEYWORD.EQ."-ANG.Rad.NbGauss") THEN
-	     CALL GETARG (NPARAM+1,PROG_ARG)	!Nb d'angles de Gauss pour les simulations de luminance
-	     READ(PROG_ARG,*,ERR=900) NBMU_GAUSS_LUM
-	     DEF_NBMU_GAUSS_LUM=1
-	 ENDIF	 
-	 	 
-	 IF (KEYWORD.EQ."-ANG.Rad.UserAngFile") THEN
-	     CALL GETARG (NPARAM+1,FICANGLES_USER_LUM)	!Nom du fichier des angles "utilisateurs" (chemin complet)
-	     DEF_FICANGLES_USER_LUM=1			!pour les calculs de luminance
-	 ENDIF	  	 
-	 		 
-	 IF (KEYWORD.EQ."-ANG.Rad.Thetas") THEN
-	     CALL GETARG (NPARAM+1,PROG_ARG)			!Angle zenithal solaire (degres)
-	     READ(PROG_ARG,*,ERR=910) TETAS 
-             DEF_TETAS=1
-	 ENDIF	
-
-	 IF (KEYWORD.EQ."-ANG.Rad.ResFile") THEN
-	     CALL GETARG (NPARAM+1,FICRES_LUM)	        !Nom du fichier resultat (chemin complet)
-	     DEF_FICRES_LUM=1				!pour les calculs de luminance
-	 ENDIF	  	
-				
-	 IF (KEYWORD.EQ."-ANG.Aer.NbGauss") THEN
-	     CALL GETARG (NPARAM+1,PROG_ARG)	!Nb d'angles de Gauss pour les calculs de Mie
-	     READ(PROG_ARG,*,ERR=905) NBMU_GAUSS_MIE
-	     DEF_NBMU_GAUSS_MIE=1
-	 ENDIF	 
-	 	 
-	 IF (KEYWORD.EQ."-ANG.Aer.UserAngFile") THEN
-	     CALL GETARG (NPARAM+1,FICANGLES_USER_MIE)	!Nom du fichier des angles "utilisateurs" (chemin complet)
-	     DEF_FICANGLES_USER_MIE=1			!pour les calculs de Mie
-	 ENDIF	  	 
-	 	 	 
-	 IF (KEYWORD.EQ."-ANG.Aer.ResFile") THEN
-	     CALL GETARG (NPARAM+1,FICRES_MIE)	        !Nom du fichier resultat (chemin complet)
-	     DEF_FICRES_MIE=1				!pour les calculs de Mie
-	 ENDIF	  	
-	 	 
-	 IF (KEYWORD.EQ."-ANG.Log") THEN
-	     CALL GETARG (NPARAM+1,FICLOG)		!Nom du fichier Trace.
-	     DEF_FICLOG=1
-	 ENDIF		 
-	 
-	 
-      ENDDO	!Fin de boucle de lecture des arguments
 	  	
 
 	 
-C --- Gestion de la coherence des arguments 
-
-C     Angle solaire : obligatoire           
-      IF (DEF_TETAS.EQ.0) GOTO 920
-      IF ((TETAS.LT.0.D-00).OR.(TETAS.GE.90.D-00)) GOTO 925
+C* Initialisation                     
+C*-----------------------------------------------------------------
+      IER=0
       
-C     Fichier resultat pour les luminances : obligatoire           
-      IF (DEF_FICRES_LUM.EQ.0) GOTO 930
-
-C     Fichier resultat pour les fonctions de phase : obligatoire           
-      IF (DEF_FICRES_MIE.EQ.0) GOTO 935
-
-C     Argument FICLOG obligatoire          
-      IF (DEF_FICLOG.EQ.0) THEN
-         GOTO 940
-      ELSE !Determination de la requete de suivi des traitements
-         IF ((FICLOG(1:1).EQ.'0').AND.(FICLOG(2:2).EQ.' ')) THEN
-	    TRACE=.FALSE.
-         ELSE
-            TRACE=.TRUE.
-         ENDIF
-      ENDIF
+      !Coefficient de conversion des degrés en radians.
+      CONVDEGRAD=INCTE_PI/180.D+00
+      
+C* Controle des paramètres                       
+C*-----------------------------------------------------------------
 
 C     Argument optionnels
 C     --> Affectation de la valeur par defaut si NBMU_GAUSS_MIE non renseigne
-      IF (DEF_NBMU_GAUSS_MIE.EQ.0) THEN
-          NBMU_GAUSS_MIE = SOS_DEFAULT_NBMU_MIE
-	  OS_NB = SOS_DEFAULT_OS_NB
+      IF (NBMU_GAUSS_MIE.EQ.CTE_NOT_DEFINED_VALUE_INT) THEN
+          NBMU_GAUSS_MIE = CTE_DEFAULT_NBMU_MIE
+	  OS_NB = CTE_DEFAULT_OS_NB
       ELSE
           !Pour une fonction de phase discretisee en NBMU_GAUSS_MIE angles de Gauss (positifs), 
 	  !sa decomposition en polynomes de Legendre ne peut etre correcte que si elle est poussee
-	  !jusqu'a un ordre valant au moins 2 fois le nb d'angles de Gauss utilises dans la 
+	  !jusqu'à un ordre valant au moins 2 fois le nb d'angles de Gauss utilises dans la 
 	  !discretisation de la fonction.
           OS_NB = 2*NBMU_GAUSS_MIE	  
       ENDIF 
 
 C     --> Affectation de la valeur par defaut si NBMU_GAUSS_LUM non renseigne
-      IF (DEF_NBMU_GAUSS_LUM.EQ.0) THEN
-          NBMU_GAUSS_LUM = SOS_DEFAULT_NBMU_LUM
-	  OS_NS = SOS_DEFAULT_OS_NS
-	  OS_NM = SOS_DEFAULT_OS_NM
+      IF (NBMU_GAUSS_LUM.EQ.CTE_NOT_DEFINED_VALUE_INT) THEN
+          NBMU_GAUSS_LUM = CTE_DEFAULT_NBMU_LUM
+	  OS_NS = CTE_DEFAULT_OS_NS
+	  OS_NM = CTE_DEFAULT_OS_NM
       ELSE
           !Pour un champs de luminance discretise en NBMU_GAUSS_LUM angles de Gauss (positifs), 
 	  !la decomposition en polynomes de Legendre des fonctions de reflexion de Fresnel
-	  !et des luminances atmospherique n'est  correcte que si elle est poussee jusqu'a 
+	  !et des luminances atmospherique n'est correcte que si elle est poussée jusqu'à 
 	  !un ordre valant au moins 2 fois le nb d'angles de Gauss utilises pour discretiser
 	  !la luminance.
           OS_NS = 2*NBMU_GAUSS_LUM
 	  
 	  !Le calcul de la fonction G des calculs de BRDF (glitter, ...) impose un ordre maximal 
-	  !des developpements en series de Fourier tel que que OS_NM >= OS_NB + OS_NS
+	  !des développements en series de Fourier tel que que OS_NM >= OS_NB + OS_NS
 	  OS_NM = OS_NB + OS_NS
       ENDIF 
       
 
-C     --> Controle des ordres limites des developpements pour les calculs 
+C     --> Controle des ordres limites des développements pour les calculs 
 C         des coefficients des matrices de phase et de reflexion
       IF (OS_NB.LT.2*NBMU_GAUSS_MIE) GOTO 945
       IF (OS_NS.LT.2*NBMU_GAUSS_LUM) GOTO 946
       IF (OS_NM.LT.(OS_NB+OS_NS))    GOTO 947
        
-      IF (OS_NB.GT.SOS_OS_NB_MAX) GOTO 9451
-      IF (OS_NS.GT.SOS_OS_NS_MAX) GOTO 9461
-      IF (OS_NM.GT.SOS_OS_NM_MAX) GOTO 9471
-            
-C     --> Utilisation d'un fichier d'angles "utilisateur"  
-      IF (DEF_FICANGLES_USER_LUM.EQ.0) THEN
-          FICANGLES_USER_LUM="NO_USER_ANGLES"
-      ENDIF
-      
-C     --> Utilisation d'un fichier d'angles "utilisateur"  
-      IF (DEF_FICANGLES_USER_MIE.EQ.0) THEN
-          FICANGLES_USER_MIE="NO_USER_ANGLES"
-      ENDIF           
-      
+      IF (OS_NB.GT.CTE_OS_NB_MAX) GOTO 9451
+      IF (OS_NS.GT.CTE_OS_NS_MAX) GOTO 9461
+      IF (OS_NM.GT.CTE_OS_NM_MAX) GOTO 9471
+                  
 
 
 C* Ouverture du fichier Trace 
 C------------------------------------------------------
-      IF (TRACE) THEN
-         OPEN (99,FILE=FICLOG,ERR=950)
+      IF (FICLOG.EQ.'NO_LOG_FILE') THEN
+	 TRACE=.FALSE.
+      ELSE
+         TRACE=.TRUE.
+	 OPEN (99,FILE=FICLOG,ERR=990)
       ENDIF
-      
+  
 
 C* Preparation des angles pour les calculs de fonction de phase 
 C--------------------------------------------------------------      
       CALL SOS_ANGLES_GAUSS_USER("MIE",NBMU_GAUSS_MIE,
      &				 FICANGLES_USER_MIE,TRACE,
-     &                           NBMU_MIE, XMU, XHR, IER) 
+     &                       NBMU_MIE, XMU, XHR, IER) 
       
       IF (IER.EQ.-1) GOTO 955
       
@@ -504,7 +405,7 @@ C-------------------------------------------------------------------
       !-->On releve juste la valeur de IMUS, les tables ne sont pas a modifier
       J=1
       DO J=1,NBMU_LUM 
-         IF (DABS(XMUS-XMU(J)).LT.SOS_SEUIL_ECART_MUS) IMUS=J
+         IF (DABS(XMUS-XMU(J)).LT.CTE_SEUIL_ECART_MUS) IMUS=J
       ENDDO
       
       !Si TETAS n'est pas un angle deja defini
@@ -536,9 +437,9 @@ C-------------------------------------------------------------------
 	     ENDIF
 	 ENDIF
 	 
-	 !-->Mise a jour de la taille des tables
+	 !-->Mise à jour de la taille des tables
 	 NBMU_LUM=NBMU_LUM+1
-	 IF (NBMU_LUM.GT.SOS_OS_NBMU_MAX) GOTO 980
+	 IF (NBMU_LUM.GT.CTE_OS_NBMU_MAX) GOTO 980
 	 
 	 !-->Positionnement de TETAS dans les tables
 	 XMU(IMUS) = XMUS
@@ -568,15 +469,16 @@ C-------------------------------------------------------------------
 C* Information de Trace 
 C-------------------------------------------------------------------         
       IF (TRACE) THEN
-         WRITE (99,*,ERR=990) "Ajout de l'angle zenithal solaire"
+        WRITE (99,*,ERR=990) "Addition of the solar zenith angle"
 	 WRITE (99,*,ERR=990) "---------------------------------"
 	 WRITE (99,*,ERR=990) " "
 	 WRITE(99,*,ERR=990) "TETAS : ", TETAS
 	 WRITE(99,*,ERR=990) "IMUS  : ", IMUS
-	 WRITE(99,*,ERR=990) "Nombre final d'angles : ", NBMU_LUM 
-         WRITE (99,*,ERR=990) " " 
-	 WRITE (99,*,err=990) "Liste des angles utilises :"
-	 WRITE (99,*,err=990) "   Indice, mu, angle (deg.), poids, user"
+	 WRITE(99,*,ERR=990) "Final number of angles : ", NBMU_LUM 
+        WRITE (99,*,ERR=990) " " 
+	 WRITE (99,*,err=990) "List of used angles :"
+	 WRITE (99,*,err=990) 
+     &	 "   Index, mu, angle (deg.), weight, user angles flag"
 	 DO J=1,NBMU_LUM
 	     WRITE(99,223,ERR=990) J, XMU(J),DACOS(XMU(J))/CONVDEGRAD,
      &	                           XHR(J),IND_ANGOUT(J)  
@@ -618,112 +520,112 @@ C----------------------------------------------
   900 WRITE(6,*) '  ERROR on argument loading for SOS_ANGLES'
       WRITE(6,*) '  --> Check required formats for '
       WRITE(6,*) '      -ANG.Rad.NbGauss value : Number of Gauss'
-      WRITE(6,*) '        angles for radiance computations (I4).' 
-      CALL EXIT(1)
+      WRITE(6,*) '       angles for radiance computations (I4).' 
+       IER=-1
       GOTO 9999     
 
   905 WRITE(6,*) '  ERROR on argument loading for SOS_ANGLES'
       WRITE(6,*) '  --> Check required formats for '
       WRITE(6,*) '      -ANG.Aer.NbGauss value : Number of Gauss'
-      WRITE(6,*) '        angles for radiance computations (I4).' 
-      CALL EXIT(1)
+      WRITE(6,*) '       angles for radiance computations (I4).' 
+       IER=-1
       GOTO 9999     
       
   910 WRITE(6,*) '  ERROR on argument loading for SOS_ANGLES'
       WRITE(6,*) '  --> Check required formats for -ANG.Thetas value :'
-      WRITE(6,*) '        Solar zenithal angle (F9, degrees).'
-      CALL EXIT(1)
+      WRITE(6,*) '      Solar zenithal angle (F9, degrees).'
+       IER=-1
       GOTO 9999  
 
   920 WRITE(6,*) '  ERROR on parameters for SOS_ANGLES'
       WRITE(6,*) '  --> Required (-Keyword Value) definition : ',
      &           '     -ANG.Rad.Thetas Value'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999 
 
   925 WRITE(6,*) '  ERROR on -ANG.Rad.Thetas value : ',
      &           'out of available range'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999 
       
       
   930 WRITE(6,*) '  ERROR on parameters for SOS_ANGLES'
       WRITE(6,*) '  --> Required (-Keyword Value) definition : ',
      &           '     -ANG.Rad.ResFile Value'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999 
 
   935 WRITE(6,*) '  ERROR on parameters for SOS_ANGLES'
       WRITE(6,*) '  --> Required (-Keyword Value) definition : ',
      &           '     -ANG.Aer.ResFile Value'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999        
                  
   940 WRITE(6,*) '  ERROR on parameters for SOS_ANGLES'
       WRITE(6,*) '  --> Required (-Keyword Value) definition : ',
      &           '     -ANG.Log Value'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999 
 
-  945 WRITE(6,*) '  ERROR : SOS_DEFAULT_OS_NB <= 2*SOS_DEFAULT_NBMU_MIE'
+  945 WRITE(6,*) '  ERROR : CTE_DEFAULT_OS_NB <= 2*CTE_DEFAULT_NBMU_MIE'
       WRITE(6,*) '  --> check value in SOS.h and compile again'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999 
 
-  946 WRITE(6,*) '  ERROR : SOS_DEFAULT_OS_NS <= 2*SOS_DEFAULT_NBMU_LUM'
+  946 WRITE(6,*) '  ERROR : CTE_DEFAULT_OS_NS <= 2*CTE_DEFAULT_NBMU_LUM'
       WRITE(6,*) '  --> check value in SOS.h and compile again'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999   
 
   947 WRITE(6,*) '  ERROR : ',
-     &    'SOS_DEFAULT_OS_NM < SOS_DEFAULT_OS_NB + SOS_DEFAULT_OS_NS'
+     &    'CTE_DEFAULT_OS_NM < CTE_DEFAULT_OS_NB + CTE_DEFAULT_OS_NS'
       WRITE(6,*) '  --> check value in SOS.h and compile again'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999                
 
- 9451 WRITE(6,*) '  ERROR : OS_NB > SOS_OS_NB_MAX'
+ 9451 WRITE(6,*) '  ERROR : OS_NB > CTE_OS_NB_MAX'
       WRITE(6,*) '  --> check value in SOS.h and compile again'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999 
 
- 9461 WRITE(6,*) '  ERROR : OS_NS > SOS_OS_NS_MAX'
+ 9461 WRITE(6,*) '  ERROR : OS_NS > CTE_OS_NS_MAX'
       WRITE(6,*) '  --> check value in SOS.h and compile again'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999   
 
- 9471 WRITE(6,*) '  ERROR : OS_NM > SOS_OS_NM_MAX'
+ 9471 WRITE(6,*) '  ERROR : OS_NM > CTE_OS_NM_MAX'
       WRITE(6,*) '  --> check value in SOS.h and compile again'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999                
             
   950 WRITE(6,*) '  ERROR on logfile opening for SOS_ANGLES'
-      CALL EXIT(1)  
+       IER=-1
       GOTO 9999  
 
   955 WRITE(6,*) '  ERROR on subroutine SOS_ANGLES_GAUSS_USER'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999
 
   960 WRITE(6,*) '  ERROR on ANGLES file opening for SOS_ANGLES'
-      CALL EXIT(1)  
+       IER=-1
       GOTO 9999  
 
   961 WRITE(6,*) '  ERROR on ANGLES file writing for SOS_ANGLES'
-      CALL EXIT(1)  
+       IER=-1
       GOTO 9999  
                    
   980 WRITE(6,*) "Error on the number of used radiance angles "
       WRITE(6,*) "(gauss angles + possibly solar angle)  : "
       WRITE(6,*) "  --> greater than the maximal number allowed "
-      WRITE(6,*) "       SOS_OS_NBMU_MAX =",SOS_OS_NBMU_MAX
-      CALL EXIT(1)
+      WRITE(6,*) "       CTE_OS_NBMU_MAX =",CTE_OS_NBMU_MAX
+       IER=-1
       GOTO 9999 
       
   990 WRITE(6,*) '  ERROR on logfile writing for SOS_ANGLES'
-      CALL EXIT(1)
+       IER=-1
       GOTO 9999
                                               
- 9999 STOP
+ 9999 RETURN
  
 C* Format
 C---------   
@@ -740,7 +642,8 @@ C---------
   420 FORMAT(15hINTERNAL_IMUS :,I4)
   500 FORMAT(16hINTERNAL_OS_NS :,I4)
   510 FORMAT(16hINTERNAL_OS_NM :,I4)
-  550 FORMAT(55hINDEX   COS_ANGLE            WEIGHT              OUTPUT)
+  550 FORMAT
+     &(58hINDEX   COS_ANGLE            WEIGHT             USER_ANGLE)
   600 FORMAT(I4,1X,2D21.14,1X,I4)
   223 FORMAT(I4,1X,D21.14,2X,F7.3,2X,D21.14,2X,I2)
   
@@ -758,22 +661,22 @@ C  les angles du fichier utilisateur.
 C
 C  Elle trie les angles
 C
-C Description des parametres
+C Description des paramètres
 C ----------------------------		  
 C
 C       USAGE (CHAR*3)  (E) : indicateur de l'usage qui sera fait du fichier d'angles : 
 C                             calculs de MIE ou simulation du champs de rayonnement LUM	
-C	NBMU_GAUSS (I4) (E) : nombre d'angles de Gauss souhaites
-C       FICANGLES_USER (CHAR*SOS_LENFIC2) (E) : nom du fichier des angles "utilisateur"
+C	 NBMU_GAUSS (I4) (E) : nombre d'angles de Gauss souhaites
+C       FICANGLES_USER (CHAR*CTE_LENFIC2) (E) : nom du fichier des angles "utilisateur"
 C                                               (chemin complet)
-C       TRACE (LOGICAL) (E)  : vrai,si ecriture dans le fichier trace
+C       TRACE (LOGICAL) (E)  : vrai,si écriture dans le fichier trace
 C       NBMU_UTILES (I4) (S) : nombre d'angles apres concatenation des angles de Gauss 
 C                              et des angles "utilisateur"
-C	XMU (double)     (S) : tableau des cosinus des angles calcules.
-C	XHR (double)     (S) : tableau des poids associes aux angles calcules.	     
+C	 XMU (double)     (S) : tableau des cosinus des angles calcules.
+C	 XHR (double)     (S) : tableau des poids associes aux angles calcules.	     
 C       IER (I4)         (S) : indice d'erreur : 0 si pas d'erreur, -1 sinon.
 C     
-C Resultat fourni par la procedure
+C Resultat fourni par la procédure
 C --------------------------------
 C   Les tableaux XMU et XHR des cosinus et poids des angles utiles
 C   Le nb d'angles NBMU_UTILES
@@ -783,13 +686,13 @@ C Description des fichiers utilises
 C ---------------------------------
 C
 C    Fichier utilisateur FICANGLES_USER: 
-C           contient une liste d'angles (en degres) a ajouter aux angles de Gauss
+C           contient une liste d'angles (en degrés) a ajouter aux angles de Gauss
 C           pour lesquels le poids attribues sera nuls (=> sans impact sur les 
 C           integrations spatiales)
 C
 C        Format : Une valeur d'angle par ligne d'enregistrement.
-C                 Les angles doivent etre compris entre 0 et 90 degres.
-C                 Nombre d'enregistrements maximal : SOS_NBMAX_USER_ANGLES
+C                 Les angles doivent etre compris entre 0 et 90 degrés.
+C                 Nombre d'enregistrements maximal : CTE_NBMAX_USER_ANGLES
 C
 C    Fichier trace : identifiant = 99 (conforme a l'ouverture par le code appelant)
 C
@@ -815,8 +718,7 @@ C==============================================================================
 
 C Constantes ANGLES
 C -----------------
-      DOUBLE PRECISION CONVDEGRAD       !Coefficient de conversion des degres en radians.
-      PARAMETER (CONVDEGRAD=SOS_PI/180.D+00)
+      DOUBLE PRECISION CONVDEGRAD       !Coefficient de conversion des degrés en radians.
 
 C* Definition des variables                                                 
 C--------------------------------------------
@@ -826,39 +728,42 @@ C--------------------------------------------
       INTEGER*4 IER             ! code d'erreur =0 si pas d'erreur, =-1 sinon
       INTEGER*4 J, K            ! Indices des tableaux d'angles
 			    
-      DOUBLE PRECISION XMU(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !Cosinus des angles (de Gauss et utilisateur)
-      DOUBLE PRECISION XHR(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX) !Poids des angles (de Gauss et utilisateur)
+      DOUBLE PRECISION XMU(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !Cosinus des angles (de Gauss et utilisateur)
+      DOUBLE PRECISION XHR(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX) !Poids des angles (de Gauss et utilisateur)
       DOUBLE PRECISION VAL	!Valeur d'angle lue dans le fichier utilisateur					
-      DOUBLE PRECISION MU_COMP(SOS_NBMAX_USER_ANGLES)  
+      DOUBLE PRECISION MU_COMP(CTE_NBMAX_USER_ANGLES)  
                                         !Cosinus des angles (de Gauss et utilisateur)
  
-      CHARACTER*SOS_LENFIC2 FICANGLES_USER  ! chemin et nom du fichier des angles "utilisateurs"
+      CHARACTER*CTE_LENFIC2 FICANGLES_USER  ! chemin et nom du fichier des angles "utilisateurs"
       CHARACTER*3 USAGE     ! Indicateur de l'usage qui sera fait du fichier d'angles : 
       			    ! calculs de MIE ou simulation du champs de rayonnement LUM			
 
 
-      LOGICAL TRACE     ! = vrai,si ecriture dans le fichier trace
+      LOGICAL TRACE     ! = vrai,si écriture dans le fichier trace
 
 C* Initialisation
 C-----------------
       IER=0
       NBMU_USER=0 
-
-C* Controle de validite du parametre USAGE
+      
+      !Coefficient de conversion des degrés en radians.
+      CONVDEGRAD=INCTE_PI/180.D+00
+ 
+C* Controle de validite du paramètre USAGE
 C------------------------------------------------------      
       IF ((USAGE.NE.'MIE').AND.(USAGE.NE.'LUM')) GOTO 950
       
 C* Controle de coherence des dimensionnements
 C------------------------------------------------------      
       IF (USAGE.EQ.'MIE') THEN
-          IF (SOS_NBANGLES_MAX.LT.SOS_MIE_NBMU_MAX) GOTO 960
+          IF (CTE_NBANGLES_MAX.LT.CTE_MIE_NBMU_MAX) GOTO 960
       ENDIF
       
       IF (USAGE.EQ.'LUM') THEN
-          IF (SOS_NBANGLES_MAX.LT.SOS_OS_NBMU_MAX) GOTO 961
+          IF (CTE_NBANGLES_MAX.LT.CTE_OS_NBMU_MAX) GOTO 961
       ENDIF
       
-      IF (NBMU_GAUSS.GE.SOS_NBANGLES_MAX) GOTO 962
+      IF (NBMU_GAUSS.GE.CTE_NBANGLES_MAX) GOTO 962
            
       
 C* Calcul des angles et poids de Gauss
@@ -871,15 +776,15 @@ C------------------------------------------------------
       	 
          OPEN(1,FILE=FICANGLES_USER,STATUS='OLD',ERR=970)      
       
-          J=0  
+         J=0  
    20	  READ(1,*,ERR=971,END=30) VAL
-               IF ((VAL.LT.0.).OR.(VAL.GT.90.)) GOTO 972              
+              IF ((VAL.LT.0.).OR.(VAL.GT.90.)) GOTO 972              
 	       J=J+1
-	       IF (J.GT.SOS_NBMAX_USER_ANGLES) GOTO 973
+	       IF (J.GT.CTE_NBMAX_USER_ANGLES) GOTO 973
 	       MU_COMP(J)=DCOS(VAL*CONVDEGRAD)
 	  GOTO 20
    30	  CLOSE(1)
-          NBMU_USER=J
+         NBMU_USER=J
     
       ENDIF
 
@@ -888,11 +793,11 @@ C------------------------------------------------------
       NBMU_UTILES = NBMU_GAUSS + NBMU_USER
 
       IF (USAGE.EQ.'MIE') THEN
-          IF (NBMU_UTILES.GT.SOS_MIE_NBMU_MAX) GOTO 980
+          IF (NBMU_UTILES.GT.CTE_MIE_NBMU_MAX) GOTO 980
       ENDIF 
       
       IF (USAGE.EQ.'LUM') THEN
-          IF (NBMU_UTILES.GT.SOS_OS_NBMU_MAX) GOTO 981
+          IF (NBMU_UTILES.GT.CTE_OS_NBMU_MAX) GOTO 981
       ENDIF 
 
 C*  Ajout des angles utilisateurs aux angles de Gauss
@@ -906,8 +811,8 @@ C------------------------------------------------------
 
       ENDIF
       
-C*  Tri des angles : cas USAGE="MIE" --> Trie de MUmin � MUmax
-C*                   cas USAGE="LUM" --> Trie de MUmax � MUmin
+C*  Tri des angles : cas USAGE="MIE" --> Trie de MUmin à MUmax
+C*                   cas USAGE="LUM" --> Trie de MUmax à MUmin
 C*    Tri sur les angles definis sur J=1,NBMU_UTILES
 C------------------------------------------------------           
       IF (USAGE.EQ.'MIE') THEN
@@ -982,9 +887,9 @@ C------------------------------------------------------
 	     WRITE(99,*,ERR=990)  
      &	       "Pas de fichier d'angles complementaires"
 	 ENDIF
-         WRITE (99,*,ERR=990) " " 
+        WRITE (99,*,ERR=990) " " 
 	 WRITE (99,*,err=990) "Liste des angles utilises :"
-	 WRITE (99,*,err=990) "   Indice, mu, angle (degres), poids"
+	 WRITE (99,*,err=990) "   Indice, mu, angle (degrés), poids"
 	 DO J=1,NBMU_UTILES
 	     WRITE(99,222,ERR=990) J, XMU(J),
      &	                           DACOS(XMU(J))/CONVDEGRAD, XHR(J)  
@@ -1004,19 +909,19 @@ C----------------------------------------------------------
        GOTO 9999        
        
   960  WRITE(6,*) "Inconsistence on size of tables in SOS.h."
-       WRITE(6,*) " --> required : SOS_NBANGLES_MAX >= SOS_MIE_NBMU_MAX"
+       WRITE(6,*) " --> required : CTE_NBANGLES_MAX >= CTE_MIE_NBMU_MAX"
        IER=-1
        GOTO 9999   
 
   961  WRITE(6,*) "Inconsistence on size of tables in SOS.h."
-       WRITE(6,*) " --> required : SOS_NBANGLES_MAX >= SOS_OS_NBMU_MAX"
+       WRITE(6,*) " --> required : CTE_NBANGLES_MAX >= CTE_OS_NBMU_MAX"
        IER=-1
        GOTO 9999        
 
   962  WRITE(6,*) "Inconsistence on size of tables in SOS.h."
        WRITE(6,*) " --> Number of required Gauss angles is ", NBMU_GAUSS
-       WRITE(6,*) "     greater than the limit SOS_NBANGLES_MAX :", 
-     &            SOS_NBANGLES_MAX
+       WRITE(6,*) "     greater than the limit CTE_NBANGLES_MAX :", 
+     &            CTE_NBANGLES_MAX
        IER=-1
        GOTO 9999        
           
@@ -1033,26 +938,26 @@ C----------------------------------------------------------
 
   972  WRITE(6,*) "Error on an user's angles value in file: "
        WRITE(6,*)  FICANGLES_USER
-       WRITE(6,*) "  --> have to defined between 0 and 90�"
+       WRITE(6,*) "  --> have to defined between 0 and 90°"
        IER=-1
        GOTO 9999   
 
   973  WRITE(6,*) "Error on the user's angles file : "
        WRITE(6,*)  FICANGLES_USER
        WRITE(6,*) "  --> The number of angles has to be < or = to"
-       WRITE(6,*) "       SOS_NBMAX_USER_ANGLES =",SOS_NBMAX_USER_ANGLES
+       WRITE(6,*) "       CTE_NBMAX_USER_ANGLES =",CTE_NBMAX_USER_ANGLES
        IER=-1
        GOTO 9999
 
   980  WRITE(6,*) "Error on the number of used phaze function angles : "
        WRITE(6,*) "  --> greater than the maximal number allowed "
-       WRITE(6,*) "       SOS_MIE_NBMU_MAX =",SOS_MIE_NBMU_MAX
+       WRITE(6,*) "       CTE_MIE_NBMU_MAX =",CTE_MIE_NBMU_MAX
        IER=-1
        GOTO 9999 
        
   981  WRITE(6,*) "Error on the number of used radiance angles : "
        WRITE(6,*) "  --> greater than the maximal number allowed "
-       WRITE(6,*) "       SOS_OS_NBMU_MAX =",SOS_OS_NBMU_MAX
+       WRITE(6,*) "       CTE_OS_NBMU_MAX =",CTE_OS_NBMU_MAX
        IER=-1
        GOTO 9999 
       
@@ -1084,15 +989,15 @@ C
 C  Les tableaux generes couvrent les valeurs XMU(-MM:MM) et XHR(-MM:MM)
 C  avec pour XMU(-MM)=-1 et XMU(MM)=1 de poids nuls.
 C
-C  Une contrainte est d'avoir SOS_NBANGLES_MAX >= MM
+C  Une contrainte est d'avoir CTE_NBANGLES_MAX >= MM
 C
-C Description des parametres
+C Description des paramètres
 C ----------------------------
 C	MM (I4) (E) : nombre d'angles de Gauss souhaites
 C	XMU (double) (S) : tableau des cosinus des angles calcules.
 C	XHR (double) (S) : tableau des poids associes aux angles calcules.			  
 C
-C Resultat fourni par la procedure
+C Resultat fourni par la procédure
 C --------------------------------
 C   Les tableaux XMU et XHR
 C   
@@ -1119,14 +1024,15 @@ C     N : ORDRE DE LA QUADRATURE SUR XL A XU
 
 C* Definition des variables                         
 C*-----------------------------------------------------------------
-      PARAMETER (IX=2*SOS_NBANGLES_MAX)
+      PARAMETER (IX=2*CTE_NBANGLES_MAX)
       IMPLICIT DOUBLE PRECISION (A-H,O-Z)
       DIMENSION Z(IX),PA(IX),W(IX),R(IX)
-      DOUBLE PRECISION AMU(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX)  !Angles de Gauss
-      DOUBLE PRECISION PMU(-SOS_NBANGLES_MAX:SOS_NBANGLES_MAX)  !Poids de Gauss
+      DOUBLE PRECISION AMU(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX)  !Angles de Gauss
+      DOUBLE PRECISION PMU(-CTE_NBANGLES_MAX:CTE_NBANGLES_MAX)  !Poids de Gauss
 
+ 
       TOL = 1.0D-15
-      PI = 3.141592653589793D+00
+      PI = INCTE_PI
       N=2*MM-2
       XL=-1
       XU=+1
@@ -1166,11 +1072,14 @@ C*-----------------------------------------------------------------
          XD = DABS(XI-X)
          XDD = XD-TOL
 	 
-         IF (XDD) 3,3,2
-    2       X = XI
-            GO TO 1
-    3       R(K) = X
-            W(K) = 2.0D+00*(1.0D+00-X*X)/(EN*PA(N))**2
+         IF (XDD.LE.0.D+00) THEN	 
+	     R(K) = X
+             W(K) = 2.0D+00*(1.0D+00-X*X)/(EN*PA(N))**2
+	  ELSE
+	     X = XI
+             GO TO 1
+	  ENDIF	    
+	    
   200 CONTINUE
 	  
       AP = (XU-XL)/2.D0

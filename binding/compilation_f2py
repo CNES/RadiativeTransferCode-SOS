@@ -1,0 +1,22 @@
+echo "SOS_ABS_ROOT:" ${SOS_ABS_ROOT}
+
+echo "Copy of ${SOS_ABS_ROOT}/src/SOS_PROC.F in outdir/."
+cp ${SOS_ABS_ROOT}/src/SOS_PROC.F outdir/.
+
+gfortran -O3 -fPIC -c ${SOS_ABS_ROOT}/src/SOS_AEROSOLS.F ${SOS_ABS_ROOT}/src/SOS_MIE.F ${SOS_ABS_ROOT}/src/SOS_ANGLES.F \
+                      ${SOS_ABS_ROOT}/src/SOS_SURFACE.F ${SOS_ABS_ROOT}/src/SOS_NOM_FIC_SURFACE.F ${SOS_ABS_ROOT}/src/SOS_GLITTER.F \
+                      ${SOS_ABS_ROOT}/src/SOS_ROUJEAN.F ${SOS_ABS_ROOT}/src/SOS_SURFACE_BPDF.F ${SOS_ABS_ROOT}/src/SOS_SUB_TRS.F \
+                      ${SOS_ABS_ROOT}/src/SOS_PREPA_ABSPROFILE.F ${SOS_ABS_ROOT}/src/SOS_ABSPROFILE.F \
+                      ${SOS_ABS_ROOT}/src/SOS_PROFIL.F ${SOS_ABS_ROOT}/src/SOS.F ${SOS_ABS_ROOT}/src/SOS_OS.F \
+                      ${SOS_ABS_ROOT}/src/SOS_PREPA_OS.F ${SOS_ABS_ROOT}/src/SOS_AGGREGATE.F \
+                      ${SOS_ABS_ROOT}/src/SOS_TRPHI.F -DSYSV -I${SOS_ABS_ROOT}/inc
+
+gfortran -E ${SOS_ABS_ROOT}/src/SOS_PROC.F -o outdir/SOS_PROC.F -I${SOS_ABS_ROOT}/inc/
+
+
+#Ligne suivante en erreur si on donne ${SOS_ABS_ROOT}/src/SOS_PROC.F au lieu de outdir/SOS_PROC.F
+f2py -c -m sos outdir/SOS_PROC.F SOS_AEROSOLS.o SOS_MIE.o SOS_ANGLES.o SOS_SURFACE.o SOS_NOM_FIC_SURFACE.o \
+                                              SOS_GLITTER.o SOS_ROUJEAN.o SOS_SURFACE_BPDF.o SOS_SUB_TRS.o SOS_PREPA_ABSPROFILE.o \
+                                              SOS_ABSPROFILE.o SOS_PROFIL.o SOS.o SOS_OS.o SOS_PREPA_OS.o SOS_AGGREGATE.o \
+                                              SOS_TRPHI.o -I${SOS_ABS_ROOT}/inc/ --opt='-O3'
+
