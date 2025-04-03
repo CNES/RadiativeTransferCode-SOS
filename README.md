@@ -22,7 +22,7 @@ By default, SOS-ABS provides the upward radiance field at TOA and the downward r
 ## Documentation
 
 - [User Manual](https://github.com/CNES/RadiativeTransferCode-SOS/blob/master/doc/SOS-ABS-User_Manual_V1.0.pdf)
-- [Example of SOS-ABS simulation from command lines](https://github.com/CNES/RadiativeTransferCode-SOS/blob/exe/runSOS-ABS_demo.ksh)
+- [Example of SOS-ABS simulation from command lines](https://github.com/CNES/RadiativeTransferCode-SOS/blob/master/exe/runSOS-ABS_demo.ksh)
 
 
 ## FAQ
